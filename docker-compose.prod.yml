@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Frontend service (production)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=https://api.pillpulse.com
+    depends_on:
+      - backend
+    volumes:
+      - ./ssl:/etc/ssl/certs
+    restart: unless-stopped
+
+  # Backend service (production)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - FRONTEND_URL=https://pillpulse.com
+      - FORCE_HTTPS=true
+      - ENABLE_RATE_LIMITING=true
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
+      - LOG_LEVEL=warn
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Database backup service
+  backup:
+    image: alpine:latest
+    volumes:
+      - ./data:/data
+      - ./backups:/backups
+    environment:
+      - BACKUP_RETENTION_DAYS=30
+    command: >
+      sh -c "
+        while true; do
+          echo 'Creating database backup...'
+          mkdir -p /backups
+          timestamp=$$(date +%Y%m%d-%H%M%S)
+          cp /data/pillpulse.db /backups/pillpulse-backup-$$timestamp.db
+          
+          # Compress old backups
+          find /backups -name '*.db' -mtime +1 -exec gzip {} \;
+          
+          # Remove old backups
+          find /backups -name '*.gz' -mtime +$${BACKUP_RETENTION_DAYS:-30} -delete
+          
+          echo 'Backup completed at' $$timestamp
+          sleep 86400
+        done
+      "
+    restart: unless-stopped
+
+  # Reverse proxy (Nginx)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/ssl/certs
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  data_volume:
+    driver: local
+  logs_volume:
+    driver: local
+  backups_volume:
+    driver: local

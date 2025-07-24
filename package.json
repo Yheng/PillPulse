@@ -1,0 +1,32 @@
+{
+  "name": "pillpulse",
+  "version": "1.0.0",
+  "description": "Full-stack medication adherence tracking application",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install",
+    "test": "cd backend && npm test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "healthcare",
+    "medication",
+    "adherence",
+    "tracking",
+    "react",
+    "express",
+    "sqlite"
+  ],
+  "author": "PillPulse Team",
+  "license": "MIT"
+}
