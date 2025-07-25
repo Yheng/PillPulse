@@ -42,8 +42,14 @@ const createScheduleValidation = [
     .withMessage('Time must be in HH:MM format (24-hour)'),
   
   body('frequency')
-    .isIn(['daily', 'weekly', 'monthly'])
-    .withMessage('Frequency must be daily, weekly, or monthly')
+    .isIn(['daily', 'weekly', 'monthly', 'as-needed'])
+    .withMessage('Frequency must be daily, weekly, monthly, or as-needed'),
+  
+  body('notes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Notes must not exceed 500 characters')
 ]
 
 // Schedule update validation (same as create but all fields optional)
@@ -67,8 +73,14 @@ const updateScheduleValidation = [
   
   body('frequency')
     .optional()
-    .isIn(['daily', 'weekly', 'monthly'])
-    .withMessage('Frequency must be daily, weekly, or monthly')
+    .isIn(['daily', 'weekly', 'monthly', 'as-needed'])
+    .withMessage('Frequency must be daily, weekly, monthly, or as-needed'),
+  
+  body('notes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Notes must not exceed 500 characters')
 ]
 
 // Query parameter validation for filtering schedules
@@ -85,8 +97,8 @@ const scheduleQueryValidation = [
   
   query('frequency')
     .optional()
-    .isIn(['daily', 'weekly', 'monthly'])
-    .withMessage('Frequency filter must be daily, weekly, or monthly'),
+    .isIn(['daily', 'weekly', 'monthly', 'as-needed'])
+    .withMessage('Frequency filter must be daily, weekly, monthly, or as-needed'),
   
   query('limit')
     .optional()
@@ -135,6 +147,7 @@ function formatScheduleResponse(schedule) {
     dosage: schedule.dosage,
     time: schedule.time,
     frequency: schedule.frequency,
+    notes: schedule.notes,
     created_at: schedule.created_at,
     updated_at: schedule.updated_at
   }
@@ -263,14 +276,14 @@ router.post('/',
   asyncHandler(async (req, res) => {
     checkValidation(req)
     
-    const { medication_name, dosage, time, frequency } = req.body
+    const { medication_name, dosage, time, frequency, notes } = req.body
     const userId = req.user.id
     
     // Insert new schedule into database
     const result = await execute(
-      `INSERT INTO schedules (user_id, medication_name, dosage, time, frequency)
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, medication_name, dosage, time, frequency]
+      `INSERT INTO schedules (user_id, medication_name, dosage, time, frequency, notes)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, medication_name, dosage, time, frequency, notes || null]
     )
     
     // Fetch the newly created schedule with all fields
@@ -305,10 +318,10 @@ router.put('/:id',
     const updateFields = {}
     
     // Only include provided fields in update
-    const allowedFields = ['medication_name', 'dosage', 'time', 'frequency']
+    const allowedFields = ['medication_name', 'dosage', 'time', 'frequency', 'notes']
     allowedFields.forEach(field => {
       if (req.body[field] !== undefined) {
-        updateFields[field] = req.body[field]
+        updateFields[field] = req.body[field] === '' ? null : req.body[field]
       }
     })
     
@@ -422,8 +435,13 @@ router.post('/bulk',
     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
     .withMessage('Each time must be in HH:MM format (24-hour)'),
   body('schedules.*.frequency')
-    .isIn(['daily', 'weekly', 'monthly'])
-    .withMessage('Each frequency must be daily, weekly, or monthly'),
+    .isIn(['daily', 'weekly', 'monthly', 'as-needed'])
+    .withMessage('Each frequency must be daily, weekly, monthly, or as-needed'),
+  body('schedules.*.notes')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Each notes field must not exceed 500 characters'),
   asyncHandler(async (req, res) => {
     checkValidation(req)
     
@@ -437,12 +455,12 @@ router.post('/bulk',
     try {
       // Create each schedule
       for (const schedule of schedules) {
-        const { medication_name, dosage, time, frequency } = schedule
+        const { medication_name, dosage, time, frequency, notes } = schedule
         
         const result = await execute(
-          `INSERT INTO schedules (user_id, medication_name, dosage, time, frequency)
-           VALUES (?, ?, ?, ?, ?)`,
-          [userId, medication_name, dosage, time, frequency]
+          `INSERT INTO schedules (user_id, medication_name, dosage, time, frequency, notes)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [userId, medication_name, dosage, time, frequency, notes || null]
         )
         
         // Fetch the created schedule

@@ -98,7 +98,8 @@ const SCHEMA_STATEMENTS = [
     medication_name TEXT NOT NULL,
     dosage TEXT NOT NULL,
     time TEXT NOT NULL,
-    frequency TEXT NOT NULL DEFAULT 'daily' CHECK (frequency IN ('daily', 'weekly', 'monthly')),
+    frequency TEXT NOT NULL DEFAULT 'daily' CHECK (frequency IN ('daily', 'weekly', 'monthly', 'as-needed')),
+    notes TEXT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
@@ -146,7 +147,9 @@ const MIGRATION_STATEMENTS = [
   `ALTER TABLE users ADD COLUMN push_notifications BOOLEAN DEFAULT 1`,
   `ALTER TABLE users ADD COLUMN email_notifications BOOLEAN DEFAULT 1`,
   `ALTER TABLE users ADD COLUMN sms_notifications BOOLEAN DEFAULT 0`,
-  `ALTER TABLE users ADD COLUMN reminder_frequency INTEGER DEFAULT 30`
+  `ALTER TABLE users ADD COLUMN reminder_frequency INTEGER DEFAULT 30`,
+  // Add notes column to schedules table if it doesn't exist
+  `ALTER TABLE schedules ADD COLUMN notes TEXT NULL`
 ]
 
 /**

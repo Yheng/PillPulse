@@ -1,8 +1,9 @@
 import express from 'express'
 import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
 import { body, validationResult } from 'express-validator'
 import { queryOne, execute } from '../models/database.js'
-import { generateToken, authenticateToken } from '../middleware/auth.js'
+import { generateToken, authenticateToken, verifyResetToken } from '../middleware/auth.js'
 import { asyncHandler, createValidationError } from '../middleware/errorHandler.js'
 import { encryptApiKey, decryptApiKey } from '../utils/encryption.js'
 
@@ -79,6 +80,27 @@ const apiKeyValidation = [
     })
 ]
 
+// Password reset request validation
+const forgotPasswordValidation = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address')
+]
+
+// Password reset validation
+const resetPasswordValidation = [
+  body('token')
+    .notEmpty()
+    .withMessage('Reset token is required'),
+  
+  body('newPassword')
+    .isLength({ min: 6 })
+    .withMessage('New password must be at least 6 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('New password must contain at least one lowercase letter, one uppercase letter, and one number')
+]
+
 /**
  * Helper Functions
  */
@@ -108,6 +130,29 @@ function formatUserResponse(user) {
     created_at: user.created_at,
     updated_at: user.updated_at
   }
+}
+
+/**
+ * Generate password reset token
+ * @param {Object} user - User object with id and email
+ * @returns {string} Reset token string
+ */
+function generateResetToken(user) {
+  const payload = {
+    userId: user.id,
+    email: user.email,
+    type: 'password-reset'
+  }
+  
+  return jwt.sign(
+    payload,
+    process.env.JWT_SECRET || 'pillpulse-dev-secret',
+    { 
+      expiresIn: '1h', // Reset tokens expire in 1 hour
+      issuer: 'pillpulse-api',
+      audience: 'pillpulse-client'
+    }
+  )
 }
 
 /**
@@ -659,6 +704,85 @@ router.put('/notification-settings',
         sms_notifications: !!updatedSettings.sms_notifications,
         reminder_frequency: updatedSettings.reminder_frequency || 30
       }
+    })
+  })
+)
+
+/**
+ * POST /api/users/forgot-password
+ * Request password reset token
+ * Sends reset token (in production, this would be emailed)
+ */
+router.post('/forgot-password',
+  forgotPasswordValidation,
+  asyncHandler(async (req, res) => {
+    checkValidation(req)
+    
+    const { email } = req.body
+    
+    // Find user by email
+    const user = await queryOne(
+      'SELECT id, email FROM users WHERE email = ?',
+      [email]
+    )
+    
+    // Always return success to prevent email enumeration
+    // In production, this would send an email with the reset link
+    if (!user) {
+      return res.json({
+        success: true,
+        message: 'If an account with that email exists, a password reset link has been sent.',
+        data: null
+      })
+    }
+    
+    // Generate reset token
+    const resetToken = generateResetToken(user)
+    
+    // In production, send email here
+    // For development, return the token in the response
+    console.log(`🔑 Password reset token for ${email}: ${resetToken}`)
+    
+    res.json({
+      success: true,
+      message: 'If an account with that email exists, a password reset link has been sent.',
+      data: {
+        // Remove this in production - token should only be sent via email
+        reset_token: resetToken,
+        dev_note: 'In production, this token would be sent via email only'
+      }
+    })
+  })
+)
+
+/**
+ * POST /api/users/reset-password
+ * Reset password using reset token
+ * Updates user password after verifying reset token
+ */
+router.post('/reset-password',
+  resetPasswordValidation,
+  verifyResetToken,
+  asyncHandler(async (req, res) => {
+    checkValidation(req)
+    
+    const { newPassword } = req.body
+    const user = req.resetUser // Set by verifyResetToken middleware
+    
+    // Hash new password
+    const saltRounds = 12
+    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds)
+    
+    // Update password in database
+    await execute(
+      'UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [hashedNewPassword, user.id]
+    )
+    
+    res.json({
+      success: true,
+      message: 'Password reset successfully',
+      data: null
     })
   })
 )
