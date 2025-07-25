@@ -1,5 +1,6 @@
 import express from 'express'
 import { body, query, param, validationResult } from 'express-validator'
+import jwt from 'jsonwebtoken'
 import { query as dbQuery, queryOne, execute } from '../models/database.js'
 import { authenticateToken, requireAdmin } from '../middleware/auth.js'
 import { asyncHandler, createValidationError } from '../middleware/errorHandler.js'
@@ -780,6 +781,176 @@ router.get('/stats',
           overall_rate: adherenceStats.overall_adherence_rate || 0
         },
         recent_activity: recentActivity
+      }
+    })
+  })
+)
+
+/**
+ * POST /api/admin/seed
+ * Seed the database with sample data for development/testing
+ */
+router.post('/seed',
+  asyncHandler(async (req, res) => {
+    const bcrypt = await import('bcrypt')
+    
+    try {
+      // Sample users data
+      const sampleUsers = [
+        { email: 'john.doe@example.com', password: 'password123', role: 'user' },
+        { email: 'jane.smith@example.com', password: 'password123', role: 'user' },
+        { email: 'mike.johnson@example.com', password: 'password123', role: 'user' },
+        { email: 'sarah.wilson@example.com', password: 'password123', role: 'user' },
+        { email: 'david.brown@example.com', password: 'password123', role: 'user' },
+        { email: 'lisa.davis@example.com', password: 'password123', role: 'user' },
+        { email: 'admin2@pillpulse.local', password: 'admin123', role: 'admin' }
+      ]
+      
+      // Sample medications
+      const medications = [
+        { medication_name: 'Metformin', dosage: '500mg', time: '08:00', frequency: 'daily' },
+        { medication_name: 'Lisinopril', dosage: '10mg', time: '09:00', frequency: 'daily' },
+        { medication_name: 'Atorvastatin', dosage: '20mg', time: '20:00', frequency: 'daily' },
+        { medication_name: 'Aspirin', dosage: '81mg', time: '08:30', frequency: 'daily' },
+        { medication_name: 'Vitamin D3', dosage: '2000 IU', time: '08:00', frequency: 'daily' }
+      ]
+      
+      let createdUsers = 0
+      let createdSchedules = 0
+      let createdRecords = 0
+      
+      // Check if sample data already exists
+      const existingUser = await queryOne('SELECT id FROM users WHERE email = ?', ['john.doe@example.com'])
+      if (existingUser) {
+        return res.json({
+          success: true,
+          message: 'Sample data already exists',
+          data: { message: 'Database already seeded' }
+        })
+      }
+      
+      // Create users
+      for (const userData of sampleUsers) {
+        const hashedPassword = await bcrypt.hash(userData.password, 12)
+        
+        const result = await execute(
+          'INSERT INTO users (email, password, role) VALUES (?, ?, ?)',
+          [userData.email, hashedPassword, userData.role]
+        )
+        
+        createdUsers++
+        
+        // Create schedules for regular users only
+        if (userData.role === 'user') {
+          // Each user gets 2-3 medications
+          const userMeds = medications.slice(0, Math.floor(Math.random() * 2) + 2)
+          
+          for (const med of userMeds) {
+            const scheduleResult = await execute(
+              'INSERT INTO schedules (user_id, medication_name, dosage, time, frequency) VALUES (?, ?, ?, ?, ?)',
+              [result.lastID, med.medication_name, med.dosage, med.time, med.frequency]
+            )
+            
+            createdSchedules++
+            
+            // Create some adherence records for the past 7 days
+            for (let i = 0; i < 7; i++) {
+              const date = new Date()
+              date.setDate(date.getDate() - i)
+              const taken = Math.random() < 0.8 // 80% adherence rate
+              
+              await execute(
+                'INSERT INTO adherence_records (schedule_id, date, taken) VALUES (?, ?, ?)',
+                [scheduleResult.lastID, date.toISOString().split('T')[0], taken]
+              )
+              
+              createdRecords++
+            }
+          }
+        }
+      }
+      
+      res.json({
+        success: true,
+        message: 'Database seeded successfully',
+        data: {
+          users_created: createdUsers,
+          schedules_created: createdSchedules,
+          adherence_records_created: createdRecords
+        }
+      })
+      
+    } catch (error) {
+      console.error('Seeding error:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to seed database',
+        data: null
+      })
+    }
+  })
+)
+
+/**
+ * POST /api/admin/login-as-user
+ * Allow admin to login as another user (impersonation)
+ */
+router.post('/login-as-user',
+  body('user_id').isInt({ min: 1 }).withMessage('User ID must be a positive integer'),
+  asyncHandler(async (req, res) => {
+    checkValidation(req)
+    
+    const { user_id } = req.body
+    
+    // Get the target user
+    const targetUser = await queryOne(
+      'SELECT id, email, role FROM users WHERE id = ?',
+      [user_id]
+    )
+    
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+        data: null
+      })
+    }
+    
+    // Prevent admin from impersonating another admin
+    if (targetUser.role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Cannot impersonate another admin user',
+        data: null
+      })
+    }
+    
+    // Generate a JWT token for the target user
+    const token = jwt.sign(
+      { 
+        userId: targetUser.id, 
+        email: targetUser.email, 
+        role: targetUser.role,
+        impersonated_by: req.user.id, // Track which admin is impersonating
+        aud: 'pillpulse-client',
+        iss: 'pillpulse-api'
+      },
+      process.env.JWT_SECRET || 'pillpulse-dev-secret',
+      { expiresIn: '4h' } // Shorter expiry for impersonation
+    )
+    
+    res.json({
+      success: true,
+      message: 'Impersonation token generated',
+      data: {
+        token,
+        user: {
+          id: targetUser.id,
+          email: targetUser.email,
+          role: targetUser.role
+        },
+        impersonated_by: req.user.email,
+        expires_in: '4h'
       }
     })
   })

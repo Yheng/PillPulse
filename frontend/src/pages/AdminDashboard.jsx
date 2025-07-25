@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 
 /**
@@ -15,8 +16,10 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('users')
   const [users, setUsers] = useState([])
   const [schedules, setSchedules] = useState([])
+  const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [seeding, setSeeding] = useState(false)
 
   /**
    * Load admin data when component mounts
@@ -29,36 +32,51 @@ const AdminDashboard = () => {
 
   /**
    * Fetch admin data from backend
-   * Loads users and schedules for administrative oversight
+   * Loads users, schedules, and stats for administrative oversight
    */
   const loadAdminData = async () => {
     try {
       setLoading(true)
       setError('')
       
-      // In real implementation, these would be API calls
-      // const [usersResponse, schedulesResponse] = await Promise.all([
-      //   fetch('/api/admin/users'),
-      //   fetch('/api/admin/schedules')
-      // ])
-      
-      // Sample data for demo
-      setUsers([
-        { id: 1, email: 'user1@example.com', role: 'user', created_at: '2025-01-01', last_login: '2025-01-20' },
-        { id: 2, email: 'user2@example.com', role: 'user', created_at: '2025-01-05', last_login: '2025-01-19' },
-        { id: 3, email: 'admin@example.com', role: 'admin', created_at: '2024-12-01', last_login: '2025-01-21' }
+      // Fetch users, schedules, and stats in parallel
+      const [usersResponse, schedulesResponse, statsResponse] = await Promise.all([
+        axios.get('/api/admin/users'),
+        axios.get('/api/admin/schedules'),
+        axios.get('/api/admin/stats')
       ])
       
-      setSchedules([
-        { id: 1, user_id: 1, user_email: 'user1@example.com', medication_name: 'Aspirin', dosage: '100mg', time: '08:00', frequency: 'daily' },
-        { id: 2, user_id: 1, user_email: 'user1@example.com', medication_name: 'Vitamin D', dosage: '1000 IU', time: '20:00', frequency: 'daily' },
-        { id: 3, user_id: 2, user_email: 'user2@example.com', medication_name: 'Metformin', dosage: '500mg', time: '07:30', frequency: 'daily' }
-      ])
+      setUsers(usersResponse.data.data.users || [])
+      setSchedules(schedulesResponse.data.data.schedules || [])
+      setStats(statsResponse.data.data)
+      
     } catch (err) {
-      setError('Failed to load admin data')
+      setError(err.response?.data?.error || 'Failed to load admin data')
       console.error('Admin data loading error:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  /**
+   * Seed database with sample data
+   */
+  const handleSeedDatabase = async () => {
+    try {
+      setSeeding(true)
+      setError('')
+      
+      const response = await axios.post('/api/admin/seed')
+      
+      // Reload admin data after seeding
+      await loadAdminData()
+      
+      alert(`Database seeded successfully!\n\nCreated:\n- ${response.data.data.users_created} users\n- ${response.data.data.schedules_created} schedules\n- ${response.data.data.adherence_records_created} adherence records`)
+      
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to seed database')
+    } finally {
+      setSeeding(false)
     }
   }
 
@@ -69,11 +87,7 @@ const AdminDashboard = () => {
    */
   const handleRoleChange = async (userId, newRole) => {
     try {
-      // API call would go here
-      // await fetch(`/api/admin/users/${userId}`, {
-      //   method: 'PUT',
-      //   body: JSON.stringify({ role: newRole })
-      // })
+      await axios.put(`/api/admin/users/${userId}`, { role: newRole })
       
       // Update local state
       setUsers(prev => 
@@ -82,7 +96,7 @@ const AdminDashboard = () => {
         )
       )
     } catch (err) {
-      setError('Failed to update user role')
+      setError(err.response?.data?.error || 'Failed to update user role')
     }
   }
 
@@ -96,14 +110,30 @@ const AdminDashboard = () => {
     }
 
     try {
-      // API call would go here
-      // await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' })
+      await axios.delete(`/api/admin/users/${userId}`)
       
       // Update local state
       setUsers(prev => prev.filter(user => user.id !== userId))
       setSchedules(prev => prev.filter(schedule => schedule.user_id !== userId))
     } catch (err) {
-      setError('Failed to delete user')
+      setError(err.response?.data?.error || 'Failed to delete user')
+    }
+  }
+
+  /**
+   * Handle login as user (impersonation)
+   * @param {number} userId - ID of user to impersonate
+   */
+  const handleLoginAsUser = async (userId) => {
+    try {
+      const response = await axios.post('/api/admin/login-as-user', { user_id: userId })
+      
+      // Open new tab with impersonation token
+      const impersonationUrl = `${window.location.origin}/dashboard?token=${response.data.data.token}&impersonation=true`
+      window.open(impersonationUrl, '_blank')
+      
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to login as user')
     }
   }
 
@@ -173,8 +203,19 @@ const AdminDashboard = () => {
               Manage users, schedules, and system settings
             </p>
           </div>
-          <div className="bg-pillpulse-teal text-white px-4 py-2 rounded-lg">
-            <span className="text-sm font-medium">Admin Panel</span>
+          <div className="flex items-center space-x-4">
+            <motion.button
+              onClick={handleSeedDatabase}
+              disabled={seeding}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              whileHover={{ scale: seeding ? 1 : 1.05 }}
+              whileTap={{ scale: seeding ? 1 : 0.95 }}
+            >
+              {seeding ? '🌱 Seeding...' : '🌱 Seed Database'}
+            </motion.button>
+            <div className="bg-gradient-to-r from-teal-500 to-blue-500 text-white px-4 py-2 rounded-lg">
+              <span className="text-sm font-medium">👑 Admin Panel</span>
+            </div>
           </div>
         </div>
       </motion.div>
@@ -252,8 +293,8 @@ const AdminDashboard = () => {
                         <tr className="border-b border-gray-200">
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Email</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Role</th>
+                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Schedules</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Created</th>
-                          <th className="text-left py-3 px-4 font-semibold text-gray-700">Last Login</th>
                           <th className="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
                         </tr>
                       </thead>
@@ -275,8 +316,8 @@ const AdminDashboard = () => {
                                 onChange={(e) => handleRoleChange(userData.id, e.target.value)}
                                 className={`text-xs px-2 py-1 rounded-full border-0 focus:ring-2 focus:ring-pillpulse-teal ${
                                   userData.role === 'admin'
-                                    ? 'bg-pillpulse-teal text-white'
-                                    : 'bg-gray-100 text-gray-800'
+                                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                    : 'bg-gradient-to-r from-blue-500 to-teal-500 text-white'
                                 }`}
                                 disabled={userData.id === user?.id} // Can't change own role
                               >
@@ -285,20 +326,37 @@ const AdminDashboard = () => {
                               </select>
                             </td>
                             <td className="py-3 px-4 text-gray-600">
-                              {formatDate(userData.created_at)}
+                              <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-medium">
+                                {userData.schedule_count || 0}
+                              </span>
                             </td>
                             <td className="py-3 px-4 text-gray-600">
-                              {formatDate(userData.last_login)}
+                              {formatDate(userData.created_at)}
                             </td>
                             <td className="py-3 px-4">
-                              {userData.id !== user?.id && (
-                                <button
-                                  onClick={() => handleDeleteUser(userData.id)}
-                                  className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors duration-200"
-                                >
-                                  Delete
-                                </button>
-                              )}
+                              <div className="flex space-x-2">
+                                {userData.role === 'user' && (
+                                  <motion.button
+                                    onClick={() => handleLoginAsUser(userData.id)}
+                                    className="bg-green-100 hover:bg-green-200 text-green-700 px-2 py-1 rounded text-xs font-medium transition-colors duration-200"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    title="Login as this user"
+                                  >
+                                    🔐 Login As
+                                  </motion.button>
+                                )}
+                                {userData.id !== user?.id && (
+                                  <motion.button
+                                    onClick={() => handleDeleteUser(userData.id)}
+                                    className="bg-red-100 hover:bg-red-200 text-red-700 px-2 py-1 rounded text-xs font-medium transition-colors duration-200"
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                  >
+                                    🗑️ Delete
+                                  </motion.button>
+                                )}
+                              </div>
                             </td>
                           </motion.tr>
                         ))}
@@ -421,21 +479,23 @@ const AdminDashboard = () => {
                       <div className="space-y-3">
                         <div className="flex justify-between">
                           <span className="text-gray-600">Total Users:</span>
-                          <span className="font-medium">{users.length}</span>
+                          <span className="font-medium">{stats?.users?.total || 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Active Schedules:</span>
-                          <span className="font-medium">{schedules.length}</span>
+                          <span className="font-medium">{stats?.schedules?.total || 0}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Admin Users:</span>
-                          <span className="font-medium">
-                            {users.filter(u => u.role === 'admin').length}
-                          </span>
+                          <span className="font-medium">{stats?.users?.admins || 0}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Database Size:</span>
-                          <span className="font-medium">2.4 MB</span>
+                          <span className="text-gray-600">Overall Adherence:</span>
+                          <span className="font-medium">{stats?.adherence?.overall_rate || 0}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Total Records:</span>
+                          <span className="font-medium">{stats?.adherence?.total_records || 0}</span>
                         </div>
                       </div>
                     </div>

@@ -53,9 +53,23 @@ export const AuthProvider = ({ children }) => {
   /**
    * Verify token validity and load user data on app initialization
    * Attempts to fetch user profile using stored token
+   * Also handles impersonation tokens from URL parameters
    */
   useEffect(() => {
     const verifyToken = async () => {
+      // Check for impersonation token in URL first
+      const urlParams = new URLSearchParams(window.location.search)
+      const impersonationToken = urlParams.get('token')
+      const isImpersonation = urlParams.get('impersonation') === 'true'
+      
+      if (impersonationToken && isImpersonation) {
+        // Set impersonation token and clear URL
+        localStorage.setItem('pillpulse_token', impersonationToken)
+        setToken(impersonationToken)
+        window.history.replaceState({}, document.title, window.location.pathname)
+        return // Let the token effect handle the rest
+      }
+      
       if (token) {
         try {
           // Verify token and get user data from backend
