@@ -43,14 +43,41 @@ export const ScheduleProvider = ({ children }) => {
    * Fetches all medication schedules for the authenticated user
    */
   useEffect(() => {
-    if (user && isAuthenticated && isAuthenticated()) {
-      fetchSchedules()
-    } else {
-      // Clear schedules when user logs out
+    try {
+      if (user && isAuthenticated && typeof isAuthenticated === 'function' && isAuthenticated()) {
+        fetchSchedules()
+        fetchAdherenceRecords()
+      } else {
+        // Clear schedules when user logs out
+        setSchedules([])
+        setAdherenceRecords([])
+      }
+    } catch (err) {
+      console.error('Error in ScheduleContext useEffect:', err)
       setSchedules([])
       setAdherenceRecords([])
+      setError('Failed to initialize schedule context')
     }
   }, [user, isAuthenticated])
+
+  /**
+   * Fetch adherence records for the authenticated user
+   * Makes API call to retrieve adherence history
+   */
+  const fetchAdherenceRecords = async () => {
+    try {
+      setError(null)
+      
+      const response = await axios.get('/api/adherence')
+      const adherenceData = response.data?.data
+      setAdherenceRecords(Array.isArray(adherenceData) ? adherenceData : [])
+    } catch (err) {
+      // Silently handle adherence fetch errors to not break the app
+      console.warn('Failed to fetch adherence records:', err.message)
+      // Ensure adherenceRecords remains an array even on error
+      setAdherenceRecords([])
+    }
+  }
 
   /**
    * Fetch all schedules for the authenticated user
@@ -62,10 +89,13 @@ export const ScheduleProvider = ({ children }) => {
       setError(null)
       
       const response = await axios.get('/api/schedules')
-      setSchedules(response.data.data || [])
+      const schedulesData = response.data?.data?.schedules || response.data?.data
+      setSchedules(Array.isArray(schedulesData) ? schedulesData : [])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch schedules')
       console.error('Error fetching schedules:', err)
+      // Ensure schedules remains an array even on error
+      setSchedules([])
     } finally {
       setLoading(false)
     }
@@ -88,7 +118,7 @@ export const ScheduleProvider = ({ children }) => {
       const newSchedule = response.data.data
       
       // Add new schedule to local state
-      setSchedules(prev => [...prev, newSchedule])
+      setSchedules(prev => Array.isArray(prev) ? [...prev, newSchedule] : [newSchedule])
       
       return newSchedule
     } catch (err) {
@@ -113,9 +143,11 @@ export const ScheduleProvider = ({ children }) => {
       
       // Update schedule in local state
       setSchedules(prev => 
-        prev.map(schedule => 
-          schedule.id === scheduleId ? updatedSchedule : schedule
-        )
+        Array.isArray(prev) 
+          ? prev.map(schedule => 
+              schedule.id === scheduleId ? updatedSchedule : schedule
+            )
+          : [updatedSchedule]
       )
       
       return updatedSchedule
@@ -137,7 +169,7 @@ export const ScheduleProvider = ({ children }) => {
       await axios.delete(`/api/schedules/${scheduleId}`)
       
       // Remove schedule from local state
-      setSchedules(prev => prev.filter(schedule => schedule.id !== scheduleId))
+      setSchedules(prev => Array.isArray(prev) ? prev.filter(schedule => schedule.id !== scheduleId) : [])
     } catch (err) {
       const errorMessage = err.response?.data?.error || 'Failed to delete schedule'
       setError(errorMessage)
@@ -165,20 +197,21 @@ export const ScheduleProvider = ({ children }) => {
       
       // Update adherence records in local state
       setAdherenceRecords(prev => {
-        const existing = prev.find(record => 
+        const prevArray = Array.isArray(prev) ? prev : []
+        const existing = prevArray.find(record => 
           record.schedule_id === scheduleId && record.date === date
         )
         
         if (existing) {
           // Update existing record
-          return prev.map(record => 
+          return prevArray.map(record => 
             record.schedule_id === scheduleId && record.date === date
               ? adherenceRecord
               : record
           )
         } else {
           // Add new record
-          return [...prev, adherenceRecord]
+          return [...prevArray, adherenceRecord]
         }
       })
       
@@ -254,6 +287,7 @@ export const ScheduleProvider = ({ children }) => {
     loading,
     error,
     fetchSchedules,
+    fetchAdherenceRecords,
     createSchedule,
     updateSchedule,
     deleteSchedule,

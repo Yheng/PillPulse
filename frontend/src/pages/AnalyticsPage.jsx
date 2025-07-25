@@ -15,6 +15,7 @@ import {
 import { Bar, Line, Pie } from 'react-chartjs-2'
 import { useAuth } from '../context/AuthContext'
 import { useSchedule } from '../context/ScheduleContext'
+import Header from '../components/Header'
 
 // Register Chart.js components
 ChartJS.register(
@@ -425,21 +426,24 @@ const AnalyticsPage = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Page Header */}
-      <motion.div
-        className="bg-white rounded-lg shadow-md p-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Medication Analytics</h1>
-            <p className="text-gray-600 mt-2">
-              Track your adherence patterns and identify improvement opportunities
-            </p>
-          </div>
+    <div className="min-h-screen bg-white">
+      <Header title="Analytics" showBackButton={true} />
+      
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        {/* Page Content */}
+        <motion.div
+          className="bg-white rounded-lg shadow-md p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800">Medication Analytics</h1>
+              <p className="text-gray-600 mt-2">
+                Track your adherence patterns and identify improvement opportunities
+              </p>
+            </div>
           
           {/* Export Buttons */}
           <div className="flex flex-col sm:flex-row gap-2">
@@ -754,6 +758,7 @@ const AnalyticsPage = () => {
           </motion.div>
         </>
       )}
+      </div>
     </div>
   )
 }

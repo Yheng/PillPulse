@@ -100,107 +100,181 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pillpulse-blue to-pillpulse-teal px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-teal-50 px-4 py-8">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 via-transparent to-teal-50/20 pointer-events-none">
+        <div className="absolute top-0 left-0 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-teal-400/10 rounded-full blur-3xl"></div>
+      </div>
+      
       <motion.div
-        className="max-w-md w-full bg-white rounded-lg shadow-xl p-8"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        className="relative max-w-md w-full bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 p-8"
+        initial={{ opacity: 0, y: 30, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
       >
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <motion.div
-            className="w-16 h-16 bg-pillpulse-blue rounded-full flex items-center justify-center mx-auto mb-4"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            className="relative w-20 h-20 mx-auto mb-6"
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
           >
-            <span className="text-white font-bold text-2xl">P</span>
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-teal-500 rounded-2xl shadow-lg"></div>
+            <div className="relative w-full h-full bg-gradient-to-br from-blue-600 to-teal-600 rounded-2xl flex items-center justify-center">
+              <span className="text-white font-bold text-3xl">💊</span>
+            </div>
           </motion.div>
-          <h1 className="text-3xl font-bold text-gray-800">PillPulse</h1>
-          <p className="text-gray-600 mt-2">
-            {isLogin ? 'Welcome back!' : 'Create your account'}
-          </p>
+          <motion.h1 
+            className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent mb-2"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            PillPulse
+          </motion.h1>
+          <motion.p 
+            className="text-gray-600 text-lg"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+          >
+            {isLogin ? 'Welcome back!' : 'Join PillPulse today'}
+          </motion.p>
         </div>
 
         {/* Error Display */}
         {error && (
           <motion.div
-            className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-50/80 backdrop-blur-sm border border-red-200/50 rounded-xl p-4 mb-6"
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.3 }}
           >
-            <p className="text-red-700 text-sm">{error}</p>
+            <p className="text-red-700 text-sm font-medium">{error}</p>
           </motion.div>
         )}
 
         {/* Authentication Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <motion.form 
+          onSubmit={handleSubmit} 
+          className="space-y-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.6 }}
+        >
           {/* Email Input */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-700">
               Email Address
             </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              className={`input-field ${formErrors.email ? 'border-red-500 focus:ring-red-500' : ''}`}
-              placeholder="Enter your email"
-              required
-              disabled={loading}
-            />
+            <div className="relative">
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 bg-white/50 border-2 rounded-xl transition-all duration-200 placeholder-gray-400 focus:outline-none focus:bg-white ${
+                  formErrors.email 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/20' 
+                    : 'border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                }`}
+                placeholder="your@email.com"
+                required
+                disabled={loading}
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                <span className="text-gray-400">📧</span>
+              </div>
+            </div>
             {formErrors.email && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
+              <motion.p 
+                className="text-sm text-red-600 font-medium"
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {formErrors.email}
+              </motion.p>
             )}
           </div>
 
           {/* Password Input */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold text-gray-700">
               Password
             </label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              className={`input-field ${formErrors.password ? 'border-red-500 focus:ring-red-500' : ''}`}
-              placeholder="Enter your password"
-              required
-              disabled={loading}
-              minLength={6}
-            />
+            <div className="relative">
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 bg-white/50 border-2 rounded-xl transition-all duration-200 placeholder-gray-400 focus:outline-none focus:bg-white ${
+                  formErrors.password 
+                    ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/20' 
+                    : 'border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                }`}
+                placeholder="Enter your password"
+                required
+                disabled={loading}
+                minLength={6}
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                <span className="text-gray-400">🔒</span>
+              </div>
+            </div>
             {formErrors.password && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
+              <motion.p 
+                className="text-sm text-red-600 font-medium"
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {formErrors.password}
+              </motion.p>
             )}
           </div>
 
           {/* Confirm Password Input - Only for Registration */}
           {!isLogin && (
             <motion.div
+              className="space-y-2"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.4 }}
             >
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-semibold text-gray-700">
                 Confirm Password
               </label>
-              <input
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleInputChange}
-                className={`input-field ${formErrors.confirmPassword ? 'border-red-500 focus:ring-red-500' : ''}`}
-                placeholder="Confirm your password"
-                required
-                disabled={loading}
-                minLength={6}
-              />
+              <div className="relative">
+                <input
+                  type="password"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 bg-white/50 border-2 rounded-xl transition-all duration-200 placeholder-gray-400 focus:outline-none focus:bg-white ${
+                    formErrors.confirmPassword 
+                      ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/20' 
+                      : 'border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                  }`}
+                  placeholder="Confirm your password"
+                  required
+                  disabled={loading}
+                  minLength={6}
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                  <span className="text-gray-400">🔐</span>
+                </div>
+              </div>
               {formErrors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{formErrors.confirmPassword}</p>
+                <motion.p 
+                  className="text-sm text-red-600 font-medium"
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  {formErrors.confirmPassword}
+                </motion.p>
               )}
             </motion.div>
           )}
@@ -208,45 +282,61 @@ const LoginPage = () => {
           {/* Submit Button */}
           <motion.button
             type="submit"
-            className="w-full btn-primary py-3 text-base font-semibold"
+            className={`w-full py-4 text-base font-semibold rounded-xl transition-all duration-200 ${
+              loading 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 shadow-lg hover:shadow-xl'
+            } text-white`}
             disabled={loading}
             whileHover={{ scale: loading ? 1 : 1.02 }}
             whileTap={{ scale: loading ? 1 : 0.98 }}
           >
             {loading ? (
               <div className="flex items-center justify-center">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                 {isLogin ? 'Signing In...' : 'Creating Account...'}
               </div>
             ) : (
-              isLogin ? 'Sign In' : 'Create Account'
+              <span className="flex items-center justify-center">
+                {isLogin ? '🚀 Sign In' : '✨ Create Account'}
+              </span>
             )}
           </motion.button>
-        </form>
+        </motion.form>
 
         {/* Toggle Between Login and Registration */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-600 text-sm">
+        <motion.div 
+          className="mt-8 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
+        >
+          <p className="text-gray-600 text-sm font-medium">
             {isLogin ? "Don't have an account?" : 'Already have an account?'}
           </p>
           <motion.button
             onClick={toggleMode}
-            className="text-pillpulse-blue hover:text-blue-600 font-medium text-sm mt-1 transition-colors duration-200"
+            className="text-transparent bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text hover:from-blue-700 hover:to-teal-700 font-semibold text-sm mt-2 transition-all duration-200"
             disabled={loading}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {isLogin ? 'Create Account' : 'Sign In'}
+            {isLogin ? '✨ Create Account' : '🚀 Sign In Instead'}
           </motion.button>
-        </div>
+        </motion.div>
 
         {/* App Description */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
+        <motion.div 
+          className="mt-8 pt-6 border-t border-gray-200/50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 1 }}
+        >
           <p className="text-gray-500 text-xs text-center leading-relaxed">
-            PillPulse helps you track medication adherence and improve your health outcomes. 
-            Secure, private, and designed with your healthcare needs in mind.
+            🏥 PillPulse helps you track medication adherence and improve your health outcomes.<br />
+            🔒 Secure, private, and designed with your healthcare needs in mind.
           </p>
-        </div>
+        </motion.div>
       </motion.div>
     </div>
   )

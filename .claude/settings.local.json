@@ -4,7 +4,10 @@
       "Bash(mkdir:*)",
       "Bash(node:*)",
       "Bash(npm install)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(pkill:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

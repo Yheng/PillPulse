@@ -137,182 +137,235 @@ const UserDashboard = () => {
   // Route protection is now handled by PrivateRoute component
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Header Section */}
+    <div className="space-y-6">
+      {/* Welcome Section */}
       <motion.div
-        className="bg-white rounded-lg shadow-md p-6"
+        className="mb-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">
-              Welcome back, {user?.email}
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Manage your medication schedule and track your adherence
-            </p>
-          </div>
-          <motion.button
-            onClick={() => setShowAddForm(true)}
-            className="btn-primary"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+        <h2 className="text-3xl font-bold text-gray-800 mb-2">
+          Welcome back, {user?.email?.split('@')[0]}
+        </h2>
+        <p className="text-gray-600">
+          Manage your medication schedule and track your adherence
+        </p>
+      </motion.div>
+
+      {/* Main Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Today's Schedule (60% on desktop) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Error Display */}
+          {error && (
+            <motion.div
+              className="bg-red-50 border border-red-200 rounded-lg p-4"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <p className="text-red-700">{error}</p>
+            </motion.div>
+          )}
+
+          {/* Today's Medications Section */}
+          <motion.div
+            className="bg-white rounded-lg shadow-md p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
           >
-            Add Medication
-          </motion.button>
-        </div>
-      </motion.div>
-
-      {/* Error Display */}
-      {error && (
-        <motion.div
-          className="bg-red-50 border border-red-200 rounded-lg p-4"
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <p className="text-red-700">{error}</p>
-        </motion.div>
-      )}
-
-      {/* Today's Medications Section */}
-      <motion.div
-        className="bg-white rounded-lg shadow-md p-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-      >
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Today's Medications</h2>
-        
-        {loading ? (
-          <LoadingStates.List items={3} />
-        ) : todaysSchedules.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>No medications scheduled for today.</p>
-            <p className="text-sm mt-2">Add your first medication to get started!</p>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {todaysSchedules.map((schedule) => {
-              const adherenceStatus = getAdherenceStatus(schedule.id, today)
-              
-              return (
-                <motion.div
-                  key={schedule.id}
-                  className={`border rounded-lg p-4 transition-all duration-200 ${
-                    adherenceStatus === true
-                      ? 'bg-green-50 border-green-200'
-                      : adherenceStatus === false
-                      ? 'bg-red-50 border-red-200'
-                      : 'bg-gray-50 border-gray-200 hover:border-pillpulse-blue'
-                  }`}
-                  whileHover={{ scale: 1.02 }}
-                  layout
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-800">
-                        {schedule.medication_name}
-                      </h3>
-                      <p className="text-sm text-gray-600">{schedule.dosage}</p>
-                      <p className="text-sm text-pillpulse-blue font-medium">
-                        {formatTime(schedule.time)}
-                      </p>
-                    </div>
-                    
-                    {/* Adherence Status Indicator */}
-                    {adherenceStatus !== null && (
-                      <div className={`w-3 h-3 rounded-full ${
-                        adherenceStatus ? 'bg-green-500' : 'bg-red-500'
-                      }`} />
-                    )}
-                  </div>
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Today's Medications</h2>
+            
+            {loading ? (
+              <LoadingStates.List items={3} />
+            ) : todaysSchedules.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No medications scheduled for today.</p>
+                <p className="text-sm mt-2">Add your first medication to get started!</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {todaysSchedules.map((schedule) => {
+                  const adherenceStatus = getAdherenceStatus(schedule.id, today)
                   
-                  {/* Adherence Buttons */}
-                  <div className="flex gap-2">
-                    <motion.button
-                      onClick={() => handleAdherenceLog(schedule.id, true)}
-                      className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                  return (
+                    <motion.div
+                      key={schedule.id}
+                      className={`border rounded-lg p-4 transition-all duration-200 ${
                         adherenceStatus === true
-                          ? 'bg-green-500 text-white'
-                          : 'bg-green-100 hover:bg-green-200 text-green-800'
+                          ? 'bg-green-50 border-green-200'
+                          : adherenceStatus === false
+                          ? 'bg-red-50 border-red-200'
+                          : 'bg-gray-50 border-gray-200 hover:border-pillpulse-blue'
                       }`}
                       whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      layout
                     >
-                      ✓ Taken
-                    </motion.button>
-                    <motion.button
-                      onClick={() => handleAdherenceLog(schedule.id, false)}
-                      className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
-                        adherenceStatus === false
-                          ? 'bg-red-500 text-white'
-                          : 'bg-red-100 hover:bg-red-200 text-red-800'
-                      }`}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      ✗ Missed
-                    </motion.button>
-                  </div>
-                </motion.div>
-              )
-            })}
-          </div>
-        )}
-      </motion.div>
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-semibold text-gray-800">
+                            {schedule.medication_name}
+                          </h3>
+                          <p className="text-sm text-gray-600">{schedule.dosage}</p>
+                          <p className="text-sm text-pillpulse-blue font-medium">
+                            {formatTime(schedule.time)}
+                          </p>
+                        </div>
+                        
+                        {/* Adherence Status Indicator */}
+                        {adherenceStatus !== null && (
+                          <div className={`w-3 h-3 rounded-full ${
+                            adherenceStatus ? 'bg-green-500' : 'bg-red-500'
+                          }`} />
+                        )}
+                      </div>
+                      
+                      {/* Adherence Buttons */}
+                      <div className="flex gap-2">
+                        <motion.button
+                          onClick={() => handleAdherenceLog(schedule.id, true)}
+                          className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                            adherenceStatus === true
+                              ? 'bg-green-500 text-white'
+                              : 'bg-green-100 hover:bg-green-200 text-green-800'
+                          }`}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          ✓ Taken
+                        </motion.button>
+                        <motion.button
+                          onClick={() => handleAdherenceLog(schedule.id, false)}
+                          className={`flex-1 py-2 px-3 rounded text-sm font-medium transition-colors ${
+                            adherenceStatus === false
+                              ? 'bg-red-500 text-white'
+                              : 'bg-red-100 hover:bg-red-200 text-red-800'
+                          }`}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          ✗ Missed
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            )}
+          </motion.div>
 
-      {/* All Schedules Section */}
-      <motion.div
-        className="bg-white rounded-lg shadow-md p-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">All Medications</h2>
-        
-        {!Array.isArray(schedules) || schedules.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <p>{loading ? 'Loading medications...' : 'No medications added yet.'}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Medication</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Dosage</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Time</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Frequency</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedules.map((schedule) => (
-                  <motion.tr
-                    key={schedule.id}
-                    className="border-b border-gray-100 hover:bg-gray-50"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <td className="py-3 px-4 font-medium text-gray-800">
-                      {schedule.medication_name}
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">{schedule.dosage}</td>
-                    <td className="py-3 px-4 text-gray-600">{formatTime(schedule.time)}</td>
-                    <td className="py-3 px-4">
-                      <span className="inline-block bg-pillpulse-blue text-white text-xs px-2 py-1 rounded-full">
-                        {schedule.frequency}
-                      </span>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </motion.div>
+          {/* All Schedules Section */}
+          <motion.div
+            className="bg-white rounded-lg shadow-md p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h2 className="text-2xl font-semibold text-gray-800 mb-4">All Medications</h2>
+            
+            {!Array.isArray(schedules) || schedules.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>{loading ? 'Loading medications...' : 'No medications added yet.'}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full table-auto">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Medication</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Dosage</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Time</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Frequency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {schedules.map((schedule) => (
+                      <motion.tr
+                        key={schedule.id}
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <td className="py-3 px-4 font-medium text-gray-800">
+                          {schedule.medication_name}
+                        </td>
+                        <td className="py-3 px-4 text-gray-600">{schedule.dosage}</td>
+                        <td className="py-3 px-4 text-gray-600">{formatTime(schedule.time)}</td>
+                        <td className="py-3 px-4">
+                          <span className="inline-block bg-pillpulse-blue text-white text-xs px-2 py-1 rounded-full">
+                            {schedule.frequency}
+                          </span>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
+        </div>
+
+        {/* Right Column - Analytics (40% on desktop) */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Streak Counter */}
+          <motion.div
+            className="bg-white rounded-lg shadow-md p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+          >
+            <div className="text-center">
+              <motion.div
+                className="w-20 h-20 bg-pillpulse-green rounded-full flex items-center justify-center mx-auto mb-4"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.5 }}
+              >
+                <span className="text-white font-bold text-2xl">🔥</span>
+              </motion.div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">Streak Counter</h3>
+              <p className="text-3xl font-bold text-pillpulse-green mb-2">5 Days</p>
+              <p className="text-sm text-gray-600">Keep it up!</p>
+            </div>
+          </motion.div>
+
+          {/* Quick Actions */}
+          <motion.div
+            className="bg-white rounded-lg shadow-md p-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+          >
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
+            <div className="space-y-3">
+              <motion.button
+                onClick={() => setShowAddForm(true)}
+                className="w-full bg-pillpulse-blue hover:bg-pillpulse-teal text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Add Schedule
+              </motion.button>
+              <motion.button
+                className="w-full bg-pillpulse-green hover:bg-green-600 text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                View Analytics
+              </motion.button>
+              <motion.button
+                className="w-full bg-pillpulse-teal hover:bg-teal-600 text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Caregiver Sync
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      </div>
 
       {/* Add Medication Modal */}
       <AnimatePresence>
