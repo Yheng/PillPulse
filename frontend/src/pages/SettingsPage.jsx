@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
 import { apiKeyService, userService, adminService } from '../services/api'
+import { NotificationPermissionBadge } from '../components/PushNotificationManager'
 
 /**
  * Settings Page Component
@@ -34,7 +35,7 @@ const SettingsPage = () => {
   const [maskedApiKey, setMaskedApiKey] = useState('')
 
   /**
-   * Load user data and API key on component mount
+   * Load user data, API key, and notification settings on component mount
    */
   useEffect(() => {
     const loadUserData = async () => {
@@ -46,13 +47,32 @@ const SettingsPage = () => {
           setMaskedApiKey(apiKeyResponse.data.masked_key || '')
         }
 
-        // Update form data with current user email
+        // Load notification settings
+        const notificationResponse = await userService.getNotificationSettings()
+        if (notificationResponse.success) {
+          const settings = notificationResponse.data
+          setFormData(prev => ({
+            ...prev,
+            email: user?.email || '',
+            pushNotifications: settings.push_notifications,
+            emailNotifications: settings.email_notifications,
+            smsNotifications: settings.sms_notifications,
+            reminderFrequency: settings.reminder_frequency
+          }))
+        } else {
+          // Set defaults if loading fails
+          setFormData(prev => ({
+            ...prev,
+            email: user?.email || ''
+          }))
+        }
+      } catch (error) {
+        console.error('Failed to load user data:', error)
+        // Set defaults on error
         setFormData(prev => ({
           ...prev,
           email: user?.email || ''
         }))
-      } catch (error) {
-        console.error('Failed to load user data:', error)
       }
     }
 
@@ -108,16 +128,22 @@ const SettingsPage = () => {
     setSuccess('')
 
     try {
-      // API call would go here
-      // await updateNotificationSettings({
-      //   pushNotifications: formData.pushNotifications,
-      //   emailNotifications: formData.emailNotifications,
-      //   smsNotifications: formData.smsNotifications,
-      //   reminderFrequency: formData.reminderFrequency
-      // })
-      setSuccess('Notification settings updated successfully!')
+      const response = await userService.updateNotificationSettings({
+        push_notifications: formData.pushNotifications,
+        email_notifications: formData.emailNotifications,
+        sms_notifications: formData.smsNotifications,
+        reminder_frequency: formData.reminderFrequency
+      })
+      
+      if (response.success) {
+        setSuccess('Notification settings updated successfully!')
+        console.log('✅ Notification settings saved:', response.data)
+      } else {
+        throw new Error(response.error || 'Failed to update settings')
+      }
     } catch (err) {
-      setError(err.message || 'Failed to update notification settings')
+      setError(err.response?.data?.error || err.message || 'Failed to update notification settings')
+      console.error('❌ Failed to save notification settings:', err)
     } finally {
       setLoading(false)
     }
@@ -443,7 +469,10 @@ const SettingsPage = () => {
           {/* Notifications Tab */}
           {activeTab === 'notifications' && (
             <div>
-              <h2 className="text-xl font-semibold text-gray-800 mb-6">Notification Preferences</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-800">Notification Preferences</h2>
+                <NotificationPermissionBadge />
+              </div>
               <form onSubmit={handleNotificationUpdate} className="space-y-6 max-w-md">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">

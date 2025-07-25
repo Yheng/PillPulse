@@ -71,6 +71,18 @@ export const userService = {
     const response = await api.put('/users/password', passwordData)
     return response.data
   },
+
+  // Get notification settings
+  async getNotificationSettings() {
+    const response = await api.get('/users/notification-settings')
+    return response.data
+  },
+
+  // Update notification settings
+  async updateNotificationSettings(settingsData) {
+    const response = await api.put('/users/notification-settings', settingsData)
+    return response.data
+  },
 }
 
 // Admin Services

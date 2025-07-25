@@ -273,40 +273,42 @@ const AnalyticsPage = () => {
    * @returns {Object} Chart.js configuration object
    */
   const getStackedBarConfig = () => {
-    if (!analyticsData?.adherence_by_medication) {
+    if (!analyticsData?.daily_trend || !analyticsData?.adherence_by_medication) {
       return { labels: [], datasets: [] }
     }
 
-    // Sample data structure - in real implementation, this would come from backend
-    const medications = schedules.map(s => s.medication_name)
-    const dates = []
-    const currentDate = new Date(dateRange.start_date)
-    const endDate = new Date(dateRange.end_date)
-    
-    // Generate date labels for the chart
-    while (currentDate <= endDate) {
-      dates.push(currentDate.toISOString().split('T')[0])
-      currentDate.setDate(currentDate.getDate() + 1)
-    }
+    // Use real daily trend data from analytics
+    const dailyTrend = analyticsData.daily_trend.slice(-7) // Last 7 days
+    const dates = dailyTrend.map(day => {
+      const date = new Date(day.date)
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    })
 
-    // Create datasets for each medication
-    const datasets = medications.map((medication, index) => ({
-      label: medication,
-      data: dates.map(() => Math.floor(Math.random() * 2)), // Sample data - replace with real data
-      backgroundColor: [
-        '#2196F3', // pillpulse-blue
-        '#81C784', // pillpulse-green
-        '#26A69A', // pillpulse-teal
-        '#B0BEC5', // pillpulse-gray
-        '#FF9800', // orange
-        '#9C27B0'  // purple
-      ][index % 6],
+    // Create datasets based on medication adherence data
+    const medicationColors = [
+      '#2196F3', // pillpulse-blue
+      '#81C784', // pillpulse-green
+      '#26A69A', // pillpulse-teal
+      '#FF9800', // orange
+      '#9C27B0', // purple
+      '#E91E63'  // pink
+    ]
+
+    const datasets = analyticsData.adherence_by_medication.map((medication, index) => ({
+      label: medication.medication_name,
+      data: dailyTrend.map(day => {
+        // Calculate medication-specific adherence for each day
+        // For now, use proportion of total taken doses based on medication adherence rate
+        const medicationProportion = medication.adherence_rate / 100
+        return Math.round(day.taken_doses * medicationProportion / analyticsData.adherence_by_medication.length)
+      }),
+      backgroundColor: medicationColors[index % medicationColors.length],
       borderWidth: 1,
       borderRadius: 4,
     }))
 
     return {
-      labels: dates.slice(0, 7), // Show last 7 days for readability
+      labels: dates,
       datasets
     }
   }
@@ -317,26 +319,26 @@ const AnalyticsPage = () => {
    * @returns {Object} Chart.js configuration object
    */
   const getLineChartConfig = () => {
-    if (!analyticsData) {
+    if (!analyticsData?.daily_trend) {
       return { labels: [], datasets: [] }
     }
 
-    // Generate sample trend data
-    const dates = []
-    const currentDate = new Date(dateRange.start_date)
-    const endDate = new Date(dateRange.end_date)
+    // Use real daily trend data from analytics
+    const dailyTrend = analyticsData.daily_trend.slice(-14) // Last 14 days
     
-    while (currentDate <= endDate && dates.length < 14) { // Show last 14 days
-      dates.push(currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
-      currentDate.setDate(currentDate.getDate() + 1)
-    }
+    const dates = dailyTrend.map(day => {
+      const date = new Date(day.date)
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    })
+
+    const adherenceData = dailyTrend.map(day => day.daily_adherence_rate || 0)
 
     return {
       labels: dates,
       datasets: [
         {
           label: 'Adherence Rate (%)',
-          data: dates.map(() => 70 + Math.random() * 30), // Sample data between 70-100%
+          data: adherenceData,
           borderColor: '#2196F3',
           backgroundColor: 'rgba(33, 150, 243, 0.1)',
           borderWidth: 3,
@@ -357,15 +359,24 @@ const AnalyticsPage = () => {
    * @returns {Object} Chart.js configuration object
    */
   const getPieChartConfig = () => {
-    // Sample data - in real implementation, calculate from actual adherence records
-    const taken = 75
-    const missed = 25
+    if (!analyticsData?.overall_stats) {
+      return { labels: [], datasets: [] }
+    }
+
+    // Use real overall statistics from analytics data
+    const takenCount = analyticsData.overall_stats.taken_count || 0
+    const missedCount = analyticsData.overall_stats.missed_count || 0
+
+    // Calculate percentages for display
+    const total = takenCount + missedCount
+    const takenPercentage = total > 0 ? Math.round((takenCount / total) * 100) : 0
+    const missedPercentage = total > 0 ? Math.round((missedCount / total) * 100) : 0
 
     return {
-      labels: ['Taken', 'Missed'],
+      labels: [`Taken (${takenPercentage}%)`, `Missed (${missedPercentage}%)`],
       datasets: [
         {
-          data: [taken, missed],
+          data: [takenCount, missedCount],
           backgroundColor: ['#81C784', '#F44336'],
           borderColor: ['#4CAF50', '#D32F2F'],
           borderWidth: 2,
@@ -548,7 +559,9 @@ const AnalyticsPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Overall Adherence</p>
-                  <p className="text-3xl font-bold text-pillpulse-green">85%</p>
+                  <p className="text-3xl font-bold text-pillpulse-green">
+                    {analyticsData?.overall_stats?.adherence_rate || 0}%
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                   <span className="text-green-600 text-xl">✓</span>
@@ -560,7 +573,9 @@ const AnalyticsPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Doses Taken</p>
-                  <p className="text-3xl font-bold text-pillpulse-blue">127</p>
+                  <p className="text-3xl font-bold text-pillpulse-blue">
+                    {analyticsData?.overall_stats?.taken_count || 0}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                   <span className="text-blue-600 text-xl">💊</span>
@@ -572,7 +587,9 @@ const AnalyticsPage = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Missed Doses</p>
-                  <p className="text-3xl font-bold text-red-500">23</p>
+                  <p className="text-3xl font-bold text-red-500">
+                    {analyticsData?.overall_stats?.missed_count || 0}
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
                   <span className="text-red-600 text-xl">✗</span>
@@ -742,18 +759,69 @@ const AnalyticsPage = () => {
           >
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Insights & Recommendations</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-medium text-blue-800 mb-2">💡 Best Performance</h3>
-                <p className="text-blue-700 text-sm">
-                  Your adherence is highest in the morning hours. Consider scheduling all medications before noon when possible.
-                </p>
-              </div>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h3 className="font-medium text-yellow-800 mb-2">⚠️ Areas for Improvement</h3>
-                <p className="text-yellow-700 text-sm">
-                  Evening medications show lower adherence rates. Set reminder alarms to improve consistency.
-                </p>
-              </div>
+              {/* Display real insights from analytics data */}
+              {analyticsData?.insights?.performance_insights?.slice(0, 2).map((insight, index) => (
+                <div 
+                  key={index}
+                  className={`${
+                    insight.type === 'excellent' ? 'bg-green-50 border-green-200' :
+                    insight.type === 'good' ? 'bg-blue-50 border-blue-200' :
+                    insight.type === 'moderate' ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-red-50 border-red-200'
+                  } border rounded-lg p-4`}
+                >
+                  <h3 className={`font-medium mb-2 ${
+                    insight.type === 'excellent' ? 'text-green-800' :
+                    insight.type === 'good' ? 'text-blue-800' :
+                    insight.type === 'moderate' ? 'text-yellow-800' :
+                    'text-red-800'
+                  }`}>
+                    {insight.type === 'excellent' ? '🎉 Excellent!' :
+                     insight.type === 'good' ? '💡 Good Progress' :
+                     insight.type === 'moderate' ? '⚠️ Room for Improvement' :
+                     '🚨 Needs Attention'}
+                  </h3>
+                  <p className={`text-sm ${
+                    insight.type === 'excellent' ? 'text-green-700' :
+                    insight.type === 'good' ? 'text-blue-700' :
+                    insight.type === 'moderate' ? 'text-yellow-700' :
+                    'text-red-700'
+                  }`}>
+                    {insight.message}
+                  </p>
+                </div>
+              ))}
+              
+              {/* Display recommendations if available */}
+              {analyticsData?.insights?.recommendations?.slice(0, 2).map((recommendation, index) => (
+                <div 
+                  key={`rec-${index}`}
+                  className="bg-purple-50 border border-purple-200 rounded-lg p-4"
+                >
+                  <h3 className="font-medium text-purple-800 mb-2">📋 Recommendation</h3>
+                  <p className="text-purple-700 text-sm">
+                    {recommendation.message}
+                  </p>
+                </div>
+              ))}
+              
+              {/* Fallback to default insights if no real data */}
+              {(!analyticsData?.insights?.performance_insights?.length && !analyticsData?.insights?.recommendations?.length) && (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h3 className="font-medium text-blue-800 mb-2">💡 Getting Started</h3>
+                    <p className="text-blue-700 text-sm">
+                      Start tracking your medications to see personalized insights and recommendations here.
+                    </p>
+                  </div>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h3 className="font-medium text-yellow-800 mb-2">📊 Analytics</h3>
+                    <p className="text-yellow-700 text-sm">
+                      Your adherence patterns and trends will appear as you build your medication history.
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </motion.div>
         </>

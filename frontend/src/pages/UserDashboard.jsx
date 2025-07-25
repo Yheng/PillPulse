@@ -5,6 +5,8 @@ import { useSchedule } from '../context/ScheduleContext'
 import { validateMedicationForm } from '../utils/validation'
 import { LoadingStates, ButtonLoader } from '../components/LoadingSpinner'
 import { AIStatusIndicator, SmartReminderButton, AIInsightsPanel, DailyAICoach, MedicationEducationTooltip } from '../components/AIFeatures'
+import PushNotificationManager, { NotificationPermissionBadge } from '../components/PushNotificationManager'
+import pushNotificationService from '../services/notificationService'
 
 /**
  * User Dashboard Component
@@ -138,21 +140,31 @@ const UserDashboard = () => {
   // Route protection is now handled by PrivateRoute component
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
-      <motion.div
-        className="mb-6"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">
-          Welcome back, {user?.email?.split('@')[0]}
-        </h2>
-        <p className="text-gray-600">
-          Manage your medication schedule and track your adherence
-        </p>
-      </motion.div>
+    <PushNotificationManager>
+      {(pushAPI) => (
+        <div className="space-y-6">
+          {/* Welcome Section */}
+          <motion.div
+            className="mb-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                  Welcome back, {user?.email?.split('@')[0]}
+                </h2>
+                <p className="text-gray-600">
+                  Manage your medication schedule and track your adherence
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <NotificationPermissionBadge />
+                <AIStatusIndicator />
+              </div>
+            </div>
+          </motion.div>
 
       {/* Main Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -511,7 +523,9 @@ const UserDashboard = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+        </div>
+      )}
+    </PushNotificationManager>
   )
 }
 

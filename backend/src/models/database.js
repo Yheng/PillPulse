@@ -83,6 +83,10 @@ const SCHEMA_STATEMENTS = [
     password TEXT NOT NULL,
     api_key TEXT NULL,
     role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+    push_notifications BOOLEAN DEFAULT 1,
+    email_notifications BOOLEAN DEFAULT 1,
+    sms_notifications BOOLEAN DEFAULT 0,
+    reminder_frequency INTEGER DEFAULT 30,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -134,6 +138,18 @@ const SCHEMA_STATEMENTS = [
 ]
 
 /**
+ * Database Migration Statements
+ * ALTER TABLE statements for adding new columns to existing databases
+ */
+const MIGRATION_STATEMENTS = [
+  // Add notification settings columns to users table if they don't exist
+  `ALTER TABLE users ADD COLUMN push_notifications BOOLEAN DEFAULT 1`,
+  `ALTER TABLE users ADD COLUMN email_notifications BOOLEAN DEFAULT 1`,
+  `ALTER TABLE users ADD COLUMN sms_notifications BOOLEAN DEFAULT 0`,
+  `ALTER TABLE users ADD COLUMN reminder_frequency INTEGER DEFAULT 30`
+]
+
+/**
  * Initialize Database
  * Creates database schema and inserts default data if needed
  * This function is called when the server starts
@@ -149,7 +165,9 @@ export async function initializeDatabase() {
     const executeNext = (index) => {
       if (index >= total) {
         console.log('✅ Database schema initialized successfully')
-        insertDefaultData(database)
+        // Run migrations after schema creation
+        runMigrations(database)
+          .then(() => insertDefaultData(database))
           .then(() => resolve())
           .catch(reject)
         return
@@ -169,6 +187,54 @@ export async function initializeDatabase() {
     }
     
     executeNext(0)
+  })
+}
+
+/**
+ * Run Database Migrations
+ * Executes ALTER TABLE statements for existing databases
+ * Safely adds new columns if they don't already exist
+ * @param {sqlite3.Database} database - Database connection
+ */
+async function runMigrations(database) {
+  return new Promise((resolve, reject) => {
+    let completed = 0
+    const total = MIGRATION_STATEMENTS.length
+    
+    if (total === 0) {
+      console.log('📊 No migrations to run')
+      resolve()
+      return
+    }
+    
+    const executeMigration = (index) => {
+      if (index >= total) {
+        console.log('✅ Database migrations completed successfully')
+        resolve()
+        return
+      }
+      
+      database.run(MIGRATION_STATEMENTS[index], (err) => {
+        // Ignore "duplicate column name" errors since columns might already exist
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error(`❌ Error executing migration ${index + 1}:`, err.message)
+          reject(err)
+          return
+        }
+        
+        if (err) {
+          console.log(`⚠️ Migration ${index + 1} skipped (column already exists)`)
+        } else {
+          console.log(`📊 Migration ${index + 1} executed successfully`)
+        }
+        
+        completed++
+        executeMigration(index + 1)
+      })
+    }
+    
+    console.log(`📊 Running ${total} database migrations...`)
+    executeMigration(0)
   })
 }
 

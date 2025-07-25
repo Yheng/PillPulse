@@ -546,4 +546,121 @@ router.post('/logout',
   })
 )
 
+/**
+ * GET /api/users/notification-settings
+ * Get user's notification preferences
+ * Returns push, email, SMS settings and reminder frequency
+ */
+router.get('/notification-settings',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userId = req.user.id
+    
+    // Get notification settings from database
+    const settings = await queryOne(
+      'SELECT push_notifications, email_notifications, sms_notifications, reminder_frequency FROM users WHERE id = ?',
+      [userId]
+    )
+    
+    // Return default settings if not found
+    const defaultSettings = {
+      push_notifications: true,
+      email_notifications: true,
+      sms_notifications: false,
+      reminder_frequency: 30
+    }
+    
+    res.json({
+      success: true,
+      message: 'Notification settings retrieved successfully',
+      data: settings || defaultSettings
+    })
+  })
+)
+
+/**
+ * PUT /api/users/notification-settings
+ * Update user's notification preferences
+ * Allows updating push, email, SMS settings and reminder frequency
+ */
+router.put('/notification-settings',
+  authenticateToken,
+  [
+    body('push_notifications').optional().isBoolean().withMessage('Push notifications must be boolean'),
+    body('email_notifications').optional().isBoolean().withMessage('Email notifications must be boolean'),
+    body('sms_notifications').optional().isBoolean().withMessage('SMS notifications must be boolean'),
+    body('reminder_frequency').optional().isInt({ min: 5, max: 120 }).withMessage('Reminder frequency must be between 5 and 120 minutes')
+  ],
+  asyncHandler(async (req, res) => {
+    checkValidation(req)
+    
+    const userId = req.user.id
+    const { 
+      push_notifications, 
+      email_notifications, 
+      sms_notifications, 
+      reminder_frequency 
+    } = req.body
+    
+    // Build update query dynamically based on provided fields
+    const updateFields = []
+    const updateValues = []
+    
+    if (typeof push_notifications === 'boolean') {
+      updateFields.push('push_notifications = ?')
+      updateValues.push(push_notifications ? 1 : 0)
+    }
+    
+    if (typeof email_notifications === 'boolean') {
+      updateFields.push('email_notifications = ?')
+      updateValues.push(email_notifications ? 1 : 0)
+    }
+    
+    if (typeof sms_notifications === 'boolean') {
+      updateFields.push('sms_notifications = ?')
+      updateValues.push(sms_notifications ? 1 : 0)
+    }
+    
+    if (reminder_frequency) {
+      updateFields.push('reminder_frequency = ?')
+      updateValues.push(reminder_frequency)
+    }
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid notification settings provided',
+        data: null
+      })
+    }
+    
+    // Add updated_at and user ID
+    updateFields.push('updated_at = CURRENT_TIMESTAMP')
+    updateValues.push(userId)
+    
+    // Update notification settings
+    await execute(
+      `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
+      updateValues
+    )
+    
+    // Fetch updated settings
+    const updatedSettings = await queryOne(
+      'SELECT push_notifications, email_notifications, sms_notifications, reminder_frequency FROM users WHERE id = ?',
+      [userId]
+    )
+    
+    res.json({
+      success: true,
+      message: 'Notification settings updated successfully',
+      data: {
+        push_notifications: !!updatedSettings.push_notifications,
+        email_notifications: !!updatedSettings.email_notifications,
+        sms_notifications: !!updatedSettings.sms_notifications,
+        reminder_frequency: updatedSettings.reminder_frequency || 30
+      }
+    })
+  })
+)
+
 export default router
