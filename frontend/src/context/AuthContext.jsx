@@ -72,19 +72,28 @@ export const AuthProvider = ({ children }) => {
       
       if (token) {
         try {
-          // Verify token and get user data from backend
-          const response = await axios.get('/api/users/profile')
+          // Manually set the Authorization header for this request
+          const response = await axios.get('/api/users/profile', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
           setUser(response.data.data)
+          console.log('✅ Token verified successfully, user:', response.data.data.email)
         } catch (error) {
           // Token is invalid, clear it
-          console.error('Token verification failed:', error)
+          console.error('❌ Token verification failed:', error.response?.status, error.message)
           logout()
         }
+      } else {
+        console.log('ℹ️ No token found in localStorage')
       }
       setLoading(false)
     }
 
-    verifyToken()
+    // Add a small delay to ensure axios interceptors are set properly
+    const timeoutId = setTimeout(verifyToken, 100)
+    return () => clearTimeout(timeoutId)
   }, [token])
 
   /**
@@ -105,11 +114,15 @@ export const AuthProvider = ({ children }) => {
       
       // Store token and update state
       localStorage.setItem('pillpulse_token', newToken)
+      console.log('✅ Login successful, token stored:', newToken.substring(0, 20) + '...')
+      console.log('✅ User data:', userData)
+      
       setToken(newToken)
       setUser(userData)
       
       return response.data
     } catch (error) {
+      console.error('❌ Login failed:', error.response?.data || error.message)
       throw new Error(error.response?.data?.error || 'Login failed')
     }
   }

@@ -203,11 +203,8 @@ router.post('/login',
       })
     }
     
-    // Update last login timestamp
-    await execute(
-      'UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [user.id]
-    )
+    // Note: We don't update updated_at on login to avoid invalidating the token
+    // Only actual profile changes should update the updated_at field
     
     // Generate JWT token
     const token = generateToken(user)

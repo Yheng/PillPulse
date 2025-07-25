@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
+import { apiKeyService, userService, adminService } from '../services/api'
 
 /**
  * Settings Page Component
@@ -29,6 +30,36 @@ const SettingsPage = () => {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
+  const [hasApiKey, setHasApiKey] = useState(false)
+  const [maskedApiKey, setMaskedApiKey] = useState('')
+
+  /**
+   * Load user data and API key on component mount
+   */
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        // Load API key
+        const apiKeyResponse = await apiKeyService.getApiKey()
+        if (apiKeyResponse.success && apiKeyResponse.data.has_api_key) {
+          setHasApiKey(true)
+          setMaskedApiKey(apiKeyResponse.data.masked_key || '')
+        }
+
+        // Update form data with current user email
+        setFormData(prev => ({
+          ...prev,
+          email: user?.email || ''
+        }))
+      } catch (error) {
+        console.error('Failed to load user data:', error)
+      }
+    }
+
+    if (user) {
+      loadUserData()
+    }
+  }, [user])
 
   /**
    * Handle input changes in settings forms
@@ -103,11 +134,17 @@ const SettingsPage = () => {
     setSuccess('')
 
     try {
-      // API call would go here
-      // await updateProfile({ email: formData.email })
-      setSuccess('Profile updated successfully!')
+      const response = await userService.updateProfile({ email: formData.email })
+      if (response.success) {
+        setSuccess('Profile updated successfully!')
+        // Update the user context with new email if needed
+        if (user.email !== formData.email) {
+          // The auth context should handle this via token refresh
+          window.location.reload()
+        }
+      }
     } catch (err) {
-      setError(err.message || 'Failed to update profile')
+      setError(err.response?.data?.error || err.message || 'Failed to update profile')
     } finally {
       setLoading(false)
     }
@@ -137,21 +174,22 @@ const SettingsPage = () => {
     }
 
     try {
-      // API call would go here
-      // await changePassword({
-      //   currentPassword: formData.currentPassword,
-      //   newPassword: formData.newPassword
-      // })
+      const response = await userService.changePassword({
+        currentPassword: formData.currentPassword,
+        newPassword: formData.newPassword
+      })
       
-      setSuccess('Password changed successfully!')
-      setFormData(prev => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      }))
+      if (response.success) {
+        setSuccess('Password changed successfully!')
+        setFormData(prev => ({
+          ...prev,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        }))
+      }
     } catch (err) {
-      setError(err.message || 'Failed to change password')
+      setError(err.response?.data?.error || err.message || 'Failed to change password')
     } finally {
       setLoading(false)
     }
@@ -175,24 +213,37 @@ const SettingsPage = () => {
     }
 
     try {
-      // API call would go here
-      // await updateApiKey({ apiKey: formData.apiKey })
-      setSuccess('API key updated successfully!')
+      const response = await apiKeyService.updateApiKey(formData.apiKey)
+      if (response.success) {
+        setSuccess('API key updated successfully!')
+        setHasApiKey(response.data.has_api_key)
+        
+        // If API key was removed, clear the form
+        if (!response.data.has_api_key) {
+          setMaskedApiKey('')
+          setFormData(prev => ({ ...prev, apiKey: '' }))
+        } else {
+          // Reload the masked key
+          const apiKeyResponse = await apiKeyService.getApiKey()
+          if (apiKeyResponse.success && apiKeyResponse.data.has_api_key) {
+            setMaskedApiKey(apiKeyResponse.data.masked_key || '')
+          }
+          // Clear the form input for security
+          setFormData(prev => ({ ...prev, apiKey: '' }))
+        }
+      }
     } catch (err) {
-      setError(err.message || 'Failed to update API key')
+      setError(err.response?.data?.error || err.message || 'Failed to update API key')
     } finally {
       setLoading(false)
     }
   }
 
-  // Redirect to login if not authenticated
-  if (!isAuthenticated()) {
+  // Show loading while authentication is being verified
+  if (!user && !isAuthenticated()) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Please log in to access settings</h2>
-          <a href="/login" className="btn-primary">Go to Login</a>
-        </div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pillpulse-blue"></div>
       </div>
     )
   }
@@ -312,10 +363,26 @@ const SettingsPage = () => {
           {activeTab === 'api' && (
             <div>
               <h2 className="text-xl font-semibold text-gray-800 mb-6">API Configuration</h2>
+              
+              {/* Current API Key Status */}
+              {hasApiKey && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-medium text-green-800">Current API Key</h3>
+                      <p className="text-sm text-green-600 font-mono">{maskedApiKey}</p>
+                    </div>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Active
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               <form onSubmit={handleApiKeyUpdate} className="space-y-4 max-w-md">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    OpenAI API Key
+                    {hasApiKey ? 'Update OpenAI API Key' : 'OpenAI API Key'}
                   </label>
                   <div className="relative">
                     <input
@@ -324,7 +391,7 @@ const SettingsPage = () => {
                       value={formData.apiKey}
                       onChange={handleInputChange}
                       className="input-field pr-12"
-                      placeholder="sk-..."
+                      placeholder={hasApiKey ? "Enter new API key to update..." : "sk-..."}
                       disabled={loading}
                     />
                     <button
@@ -337,19 +404,38 @@ const SettingsPage = () => {
                   </div>
                   <div className="mt-2 text-xs text-gray-500 space-y-1">
                     <p>• Your API key is encrypted and stored securely</p>
-                    <p>• Used only for generating personalized medication reminders</p>
+                    <p>• Used for generating personalized medication reminders and insights</p>
+                    <p>• Leave empty and click Save to remove your API key</p>
                   </div>
                 </div>
 
-                <motion.button
-                  type="submit"
-                  className="bg-pillpulse-green hover:bg-pillpulse-teal text-white py-3 px-6 rounded-md font-medium transition-colors duration-200"
-                  disabled={loading}
-                  whileHover={{ scale: loading ? 1 : 1.02 }}
-                  whileTap={{ scale: loading ? 1 : 0.98 }}
-                >
-                  {loading ? 'Updating...' : 'Save'}
-                </motion.button>
+                <div className="flex space-x-3">
+                  <motion.button
+                    type="submit"
+                    className="bg-pillpulse-green hover:bg-pillpulse-teal text-white py-3 px-6 rounded-md font-medium transition-colors duration-200"
+                    disabled={loading}
+                    whileHover={{ scale: loading ? 1 : 1.02 }}
+                    whileTap={{ scale: loading ? 1 : 0.98 }}
+                  >
+                    {loading ? 'Updating...' : (hasApiKey ? 'Update' : 'Save')}
+                  </motion.button>
+                  
+                  {hasApiKey && (
+                    <motion.button
+                      type="button"
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, apiKey: '' }))
+                        handleApiKeyUpdate({ preventDefault: () => {} })
+                      }}
+                      className="bg-red-500 hover:bg-red-600 text-white py-3 px-6 rounded-md font-medium transition-colors duration-200"
+                      disabled={loading}
+                      whileHover={{ scale: loading ? 1 : 1.02 }}
+                      whileTap={{ scale: loading ? 1 : 0.98 }}
+                    >
+                      Remove
+                    </motion.button>
+                  )}
+                </div>
               </form>
             </div>
           )}

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useSchedule } from '../context/ScheduleContext'
 import { validateMedicationForm } from '../utils/validation'
 import { LoadingStates, ButtonLoader } from '../components/LoadingSpinner'
+import { AIStatusIndicator, SmartReminderButton, AIInsightsPanel, DailyAICoach, MedicationEducationTooltip } from '../components/AIFeatures'
 
 /**
  * User Dashboard Component
@@ -204,9 +205,11 @@ const UserDashboard = () => {
                     >
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <h3 className="font-semibold text-gray-800">
-                            {schedule.medication_name}
-                          </h3>
+                          <MedicationEducationTooltip medicationName={schedule.medication_name}>
+                            <h3 className="font-semibold text-gray-800 cursor-help hover:text-pillpulse-blue transition-colors">
+                              {schedule.medication_name}
+                            </h3>
+                          </MedicationEducationTooltip>
                           <p className="text-sm text-gray-600">{schedule.dosage}</p>
                           <p className="text-sm text-pillpulse-blue font-medium">
                             {formatTime(schedule.time)}
@@ -247,6 +250,18 @@ const UserDashboard = () => {
                         >
                           ✗ Missed
                         </motion.button>
+                      </div>
+                      
+                      {/* Smart AI Reminder Button */}
+                      <div className="mt-3 pt-3 border-t border-gray-100">
+                        <SmartReminderButton 
+                          schedule={schedule}
+                          className="w-full"
+                          onReminderGenerated={(reminder) => {
+                            // You could show a toast notification here
+                            console.log('AI Reminder:', reminder)
+                          }}
+                        />
                       </div>
                     </motion.div>
                   )
@@ -309,6 +324,18 @@ const UserDashboard = () => {
 
         {/* Right Column - Analytics (40% on desktop) */}
         <div className="lg:col-span-1 space-y-6">
+          {/* AI Status Indicator */}
+          <div className="flex items-center justify-between bg-white rounded-lg shadow-md p-4">
+            <span className="text-sm font-medium text-gray-700">AI Features</span>
+            <AIStatusIndicator />
+          </div>
+
+          {/* Daily AI Coach */}
+          <DailyAICoach />
+
+          {/* AI Insights Panel */}
+          <AIInsightsPanel />
+
           {/* Streak Counter */}
           <motion.div
             className="bg-white rounded-lg shadow-md p-6"
@@ -349,6 +376,7 @@ const UserDashboard = () => {
                 Add Schedule
               </motion.button>
               <motion.button
+                onClick={() => window.location.href = '/analytics'}
                 className="w-full bg-pillpulse-green hover:bg-green-600 text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}

@@ -12,6 +12,7 @@ import scheduleRoutes from './src/routes/scheduleRoutes.js'
 import adherenceRoutes from './src/routes/adherenceRoutes.js'
 import analyticsRoutes from './src/routes/analyticsRoutes.js'
 import adminRoutes from './src/routes/adminRoutes.js'
+import aiRoutes from './src/routes/aiRoutes.js'
 
 // Import database initialization
 import { initializeDatabase } from './src/models/database.js'
@@ -124,6 +125,9 @@ app.use('/api/analytics', analyticsRoutes)
 
 // Admin management routes (protected)
 app.use('/api/admin', adminRoutes)
+
+// AI-powered features routes
+app.use('/api/ai', aiRoutes)
 
 /**
  * Error Handling

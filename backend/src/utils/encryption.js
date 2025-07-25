@@ -7,10 +7,9 @@ import crypto from 'crypto'
  */
 
 // Encryption configuration
-const ALGORITHM = 'aes-256-gcm'
+const ALGORITHM = 'aes-256-cbc'
 const KEY_LENGTH = 32 // 256 bits
-const IV_LENGTH = 12 // 96 bits for GCM
-const TAG_LENGTH = 16 // 128 bits authentication tag
+const IV_LENGTH = 16 // 128 bits for CBC
 
 /**
  * Get or generate encryption key
@@ -50,8 +49,8 @@ function getEncryptionKey() {
 }
 
 /**
- * Encrypt sensitive data using AES-256-GCM
- * Returns base64-encoded string containing IV, encrypted data, and authentication tag
+ * Encrypt sensitive data using AES-256-CBC
+ * Returns base64-encoded string containing IV and encrypted data
  * @param {string} plaintext - Data to encrypt
  * @returns {string} Base64-encoded encrypted data
  * @throws {Error} If encryption fails
@@ -69,18 +68,14 @@ export function encryptApiKey(plaintext) {
     const key = getEncryptionKey()
     
     // Create cipher
-    const cipher = crypto.createCipherGCM(ALGORITHM, key, iv)
-    cipher.setAAD(Buffer.from('pillpulse-api-key', 'utf8')) // Additional authenticated data
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv)
     
     // Encrypt the data
-    let encrypted = cipher.update(plaintext, 'utf8')
-    cipher.final()
+    let encrypted = cipher.update(plaintext, 'utf8', 'hex')
+    encrypted += cipher.final('hex')
     
-    // Get authentication tag
-    const tag = cipher.getAuthTag()
-    
-    // Combine IV, encrypted data, and tag
-    const combined = Buffer.concat([iv, encrypted, tag])
+    // Combine IV and encrypted data
+    const combined = Buffer.concat([iv, Buffer.from(encrypted, 'hex')])
     
     // Return as base64 string
     return combined.toString('base64')
@@ -107,27 +102,24 @@ export function decryptApiKey(encryptedData) {
     const combined = Buffer.from(encryptedData, 'base64')
     
     // Validate minimum length
-    const minLength = IV_LENGTH + TAG_LENGTH + 1 // IV + tag + at least 1 byte of data
+    const minLength = IV_LENGTH + 1 // IV + at least 1 byte of data
     if (combined.length < minLength) {
       throw new Error('Invalid encrypted data format')
     }
     
     // Extract components
     const iv = combined.subarray(0, IV_LENGTH)
-    const tag = combined.subarray(combined.length - TAG_LENGTH)
-    const encrypted = combined.subarray(IV_LENGTH, combined.length - TAG_LENGTH)
+    const encrypted = combined.subarray(IV_LENGTH)
     
     // Get decryption key
     const key = getEncryptionKey()
     
     // Create decipher
-    const decipher = crypto.createDecipherGCM(ALGORITHM, key, iv)
-    decipher.setAAD(Buffer.from('pillpulse-api-key', 'utf8')) // Same AAD as encryption
-    decipher.setAuthTag(tag)
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
     
     // Decrypt the data
     let decrypted = decipher.update(encrypted, null, 'utf8')
-    decipher.final()
+    decrypted += decipher.final('utf8')
     
     return decrypted
     

@@ -3,6 +3,7 @@ import { query, param, validationResult } from 'express-validator'
 import { query as dbQuery, queryOne } from '../models/database.js'
 import { authenticateToken } from '../middleware/auth.js'
 import { asyncHandler, createValidationError } from '../middleware/errorHandler.js'
+import { generateAIInsights, hasOpenAIKey } from '../utils/openaiService.js'
 
 /**
  * Analytics Routes
@@ -252,7 +253,37 @@ router.get('/',
     `, queryParams)
     
     // Calculate insights and recommendations
-    const insights = generateInsights(overallStats, adherenceByMedication, timeAnalysis, dayOfWeekAnalysis)
+    const basicInsights = generateInsights(overallStats, adherenceByMedication, timeAnalysis, dayOfWeekAnalysis)
+    
+    // Try to get AI-powered insights if user has API key
+    const hasAI = await hasOpenAIKey(userId)
+    let aiInsights = { insights: [], recommendations: [], patterns: [] }
+    
+    if (hasAI) {
+      try {
+        aiInsights = await generateAIInsights(userId)
+        console.log(`✅ Generated AI insights for analytics (user ${userId})`)
+      } catch (error) {
+        console.error('❌ Error generating AI insights for analytics:', error.message)
+      }
+    }
+    
+    // Combine basic and AI insights
+    const insights = {
+      performance_insights: [
+        ...(basicInsights.performance_insights || []),
+        ...(aiInsights.insights || [])
+      ].slice(0, 5), // Limit to top 5 insights
+      recommendations: [
+        ...(basicInsights.recommendations || []),
+        ...(aiInsights.recommendations || [])
+      ].slice(0, 5), // Limit to top 5 recommendations
+      patterns: [
+        ...(basicInsights.patterns || []),
+        ...(aiInsights.patterns || [])
+      ].slice(0, 3), // Limit to top 3 patterns
+      ai_powered: hasAI
+    }
     
     res.json({
       success: true,
