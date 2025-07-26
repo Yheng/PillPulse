@@ -11,6 +11,8 @@
 [![SQLite](https://img.shields.io/badge/SQLite-3.0+-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://sqlite.org/)
 [![AI Powered](https://img.shields.io/badge/AI-Powered-FF6B6B?style=flat-square&logo=openai&logoColor=white)](https://openai.com/)
 
+![Visitor Count](https://visitor-badge.laobi.icu/badge?page_id=Yheng.PillPulse&left_color=red&right_color=green&left_text=Visitors)
+
 *Empowering chronic illness patients with intelligent medication tracking, AI-powered reminders, and comprehensive adherence analytics.*
 
 </div>
