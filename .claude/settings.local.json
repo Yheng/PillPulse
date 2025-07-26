@@ -18,7 +18,9 @@
       "Bash(cmd //c:*)",
       "Bash(python:*)",
       "Bash(git reset:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }
