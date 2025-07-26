@@ -299,6 +299,65 @@ Authorization: Bearer <your-jwt-token>
 
 ---
 
+## 📸 **Screenshots**
+
+<div align="center">
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="images/login.jpeg" alt="Login Page" width="100%"/>
+<b>Login Page</b>
+</td>
+<td align="center" width="50%">
+<img src="images/dashboard.jpeg" alt="Dashboard" width="100%"/>
+<b>Dashboard</b>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="images/add-medication.jpeg" alt="Add Medication" width="100%"/>
+<b>Add Medication</b>
+</td>
+<td align="center" width="50%">
+<img src="images/schedules.jpeg" alt="Schedules" width="100%"/>
+<b>Schedules</b>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="images/notification.jpeg" alt="Notifications" width="100%"/>
+<b>Notifications</b>
+</td>
+<td align="center" width="50%">
+<img src="images/analytics.jpeg" alt="Analytics" width="100%"/>
+<b>Analytics</b>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="images/settings-profile.jpeg" alt="Settings - Profile" width="100%"/>
+<b>Settings - Profile</b>
+</td>
+<td align="center" width="50%">
+<img src="images/settings-api.jpeg" alt="Settings - API" width="100%"/>
+<b>Settings - API</b>
+</td>
+</tr>
+<tr>
+<td align="center" width="50%">
+<img src="images/settings-notification.jpeg" alt="Settings - Notifications" width="100%"/>
+<b>Settings - Notifications</b>
+</td>
+<td align="center" width="50%">
+<img src="images/settings-caregiver.jpeg" alt="Settings - Caregiver" width="100%"/>
+<b>Settings - Caregiver</b>
+</td>
+</tr>
+</table>
+</div>
+
+---
+
 ## 🌐 **Deployment Options**
 
 ### 🐳 **Docker Production**
