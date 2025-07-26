@@ -19,6 +19,7 @@
     "express-validator": "^7.0.1",
     "helmet": "^7.0.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^7.0.5",
     "openai": "^5.10.2",
     "sqlite3": "^5.1.6"
   },

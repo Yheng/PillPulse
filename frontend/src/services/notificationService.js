@@ -3,6 +3,7 @@
  * Handles browser push notifications with professional UX design
  * Integrates with existing notification system and AI reminders
  */
+import { notificationSound, showNotificationWithSound } from '../utils/notificationSound'
 
 class PushNotificationService {
   constructor() {
@@ -80,11 +81,11 @@ class PushNotificationService {
   }
 
   /**
-   * Show a medication reminder push notification
+   * Show a medication reminder push notification with sound
    * @param {Object} reminderData - Reminder information
    * @param {Object} options - Notification display options
    */
-  showMedicationReminder(reminderData, options = {}) {
+  async showMedicationReminder(reminderData, options = {}) {
     if (this.permission !== 'granted') {
       console.warn('Cannot show notification: permission not granted')
       return null
@@ -105,7 +106,18 @@ class PushNotificationService {
 
     const body = ai_message 
       ? ai_message
-      : `Take your ${dosage} dose scheduled for ${this.formatTime(time)}.`
+      : `Take your ${dosage} dose scheduled for ${this.formatTime(time, reminderData.user_timezone)}.`
+
+    // Play notification sound first
+    try {
+      if (urgent) {
+        await notificationSound.playReminderTone()
+      } else {
+        await notificationSound.playReminderTone()
+      }
+    } catch (error) {
+      console.warn('Could not play notification sound:', error)
+    }
 
     const notificationOptions = {
       body,
@@ -113,7 +125,7 @@ class PushNotificationService {
       badge: '/favicon.ico',
       tag: `medication-${schedule_id}`,
       requireInteraction: urgent,
-      silent: false,
+      silent: true, // We handle sound ourselves
       vibrate: urgent ? [200, 100, 200, 100, 200] : [200, 100, 200],
       actions: [
         {
@@ -317,22 +329,51 @@ class PushNotificationService {
   }
 
   /**
-   * Format time for display in notifications
+   * Format time for display in notifications with timezone awareness
    * @param {string} time - Time in HH:MM format
+   * @param {string} timezone - User's timezone (optional)
    * @returns {string} Formatted time
    */
-  formatTime(time) {
+  formatTime(time, timezone = null) {
     if (!time) return ''
     
-    const [hours, minutes] = time.split(':')
-    const hour = parseInt(hours)
-    const ampm = hour >= 12 ? 'PM' : 'AM'
-    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-    return `${displayHour}:${minutes} ${ampm}`
+    try {
+      if (timezone) {
+        // Create a date object for today with the given time
+        const today = new Date()
+        const [hours, minutes] = time.split(':')
+        today.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+        
+        // Format in user's timezone
+        const formatter = new Intl.DateTimeFormat('en-US', {
+          timeZone: timezone,
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        })
+        
+        return formatter.format(today)
+      } else {
+        // Fallback to simple formatting
+        const [hours, minutes] = time.split(':')
+        const hour = parseInt(hours)
+        const ampm = hour >= 12 ? 'PM' : 'AM'
+        const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+        return `${displayHour}:${minutes} ${ampm}`
+      }
+    } catch (error) {
+      console.error('Error formatting time:', error)
+      // Fallback to simple formatting
+      const [hours, minutes] = time.split(':')
+      const hour = parseInt(hours)
+      const ampm = hour >= 12 ? 'PM' : 'AM'
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+      return `${displayHour}:${minutes} ${ampm}`
+    }
   }
 
   /**
-   * Test notification functionality
+   * Test notification functionality with sound
    */
   async testNotification() {
     if (this.permission !== 'granted') {
@@ -340,11 +381,11 @@ class PushNotificationService {
     }
 
     if (this.permission === 'granted') {
-      this.showMedicationReminder({
+      await this.showMedicationReminder({
         medication_name: 'Test Medication',
         dosage: '10mg',
         time: '14:30',
-        ai_message: 'This is a test notification to verify push notifications are working correctly.',
+        ai_message: 'This is a test notification to verify push notifications and sound are working correctly.',
         schedule_id: 'test'
       })
       return true

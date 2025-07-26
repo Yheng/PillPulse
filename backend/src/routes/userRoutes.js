@@ -2,7 +2,7 @@ import express from 'express'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { body, validationResult } from 'express-validator'
-import { queryOne, execute } from '../models/database.js'
+import { queryOne, execute, query as queryAll } from '../models/database.js'
 import { generateToken, authenticateToken, verifyResetToken } from '../middleware/auth.js'
 import { asyncHandler, createValidationError } from '../middleware/errorHandler.js'
 import { encryptApiKey, decryptApiKey } from '../utils/encryption.js'
@@ -603,7 +603,7 @@ router.get('/notification-settings',
     
     // Get notification settings from database
     const settings = await queryOne(
-      'SELECT push_notifications, email_notifications, sms_notifications, reminder_frequency FROM users WHERE id = ?',
+      'SELECT push_notifications, email_notifications, sms_notifications, reminder_frequency, timezone FROM users WHERE id = ?',
       [userId]
     )
     
@@ -612,7 +612,8 @@ router.get('/notification-settings',
       push_notifications: true,
       email_notifications: true,
       sms_notifications: false,
-      reminder_frequency: 30
+      reminder_frequency: 30,
+      timezone: 'America/New_York'
     }
     
     res.json({
@@ -634,7 +635,8 @@ router.put('/notification-settings',
     body('push_notifications').optional().isBoolean().withMessage('Push notifications must be boolean'),
     body('email_notifications').optional().isBoolean().withMessage('Email notifications must be boolean'),
     body('sms_notifications').optional().isBoolean().withMessage('SMS notifications must be boolean'),
-    body('reminder_frequency').optional().isInt({ min: 5, max: 120 }).withMessage('Reminder frequency must be between 5 and 120 minutes')
+    body('reminder_frequency').optional().isInt({ min: 1, max: 60 }).withMessage('Reminder frequency must be between 1 and 60 minutes'),
+  body('timezone').optional().isString().withMessage('Timezone must be a valid string')
   ],
   asyncHandler(async (req, res) => {
     checkValidation(req)
@@ -644,7 +646,8 @@ router.put('/notification-settings',
       push_notifications, 
       email_notifications, 
       sms_notifications, 
-      reminder_frequency 
+      reminder_frequency,
+      timezone
     } = req.body
     
     // Build update query dynamically based on provided fields
@@ -671,6 +674,11 @@ router.put('/notification-settings',
       updateValues.push(reminder_frequency)
     }
     
+    if (timezone) {
+      updateFields.push('timezone = ?')
+      updateValues.push(timezone)
+    }
+    
     if (updateFields.length === 0) {
       return res.status(400).json({
         success: false,
@@ -691,7 +699,7 @@ router.put('/notification-settings',
     
     // Fetch updated settings
     const updatedSettings = await queryOne(
-      'SELECT push_notifications, email_notifications, sms_notifications, reminder_frequency FROM users WHERE id = ?',
+      'SELECT push_notifications, email_notifications, sms_notifications, reminder_frequency, timezone FROM users WHERE id = ?',
       [userId]
     )
     
@@ -702,7 +710,8 @@ router.put('/notification-settings',
         push_notifications: !!updatedSettings.push_notifications,
         email_notifications: !!updatedSettings.email_notifications,
         sms_notifications: !!updatedSettings.sms_notifications,
-        reminder_frequency: updatedSettings.reminder_frequency || 30
+        reminder_frequency: updatedSettings.reminder_frequency || 30,
+        timezone: updatedSettings.timezone || 'America/New_York'
       }
     })
   })
@@ -752,6 +761,128 @@ router.post('/forgot-password',
         dev_note: 'In production, this token would be sent via email only'
       }
     })
+  })
+)
+
+/**
+ * GET /api/users/notifications
+ * Get user's recent notifications
+ * Returns paginated list of notifications
+ */
+router.get('/notifications',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userId = req.user.id
+    const limit = parseInt(req.query.limit) || 20
+    const offset = parseInt(req.query.offset) || 0
+    const unreadOnly = req.query.unread_only === 'true'
+    
+    try {
+      // Build query based on filters
+      let whereClause = 'WHERE user_id = ?'
+      let params = [userId]
+      
+      if (unreadOnly) {
+        whereClause += ' AND read_at IS NULL'
+      }
+      
+      // Get notifications with pagination
+      const notifications = await queryAll(`
+        SELECT 
+          id,
+          schedule_id,
+          type,
+          title,
+          message,
+          sent_at,
+          read_at,
+          ai_generated
+        FROM notifications
+        ${whereClause}
+        ORDER BY sent_at DESC
+        LIMIT ? OFFSET ?
+      `, [...params, limit, offset])
+      
+      // Get total count
+      const countResult = await queryOne(`
+        SELECT COUNT(*) as total
+        FROM notifications
+        ${whereClause}
+      `, params)
+      
+      const total = countResult?.total || 0
+      
+      res.json({
+        success: true,
+        message: 'Notifications retrieved successfully',
+        data: {
+          notifications,
+          pagination: {
+            total,
+            limit,
+            offset,
+            has_more: offset + notifications.length < total
+          }
+        }
+      })
+    } catch (err) {
+      console.error('❌ Failed to get notifications:', err)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve notifications',
+        data: null
+      })
+    }
+  })
+)
+
+/**
+ * PUT /api/users/notifications/:id/read
+ * Mark a notification as read
+ */
+router.put('/notifications/:id/read',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userId = req.user.id
+    const notificationId = parseInt(req.params.id)
+    
+    if (!notificationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid notification ID',
+        data: null
+      })
+    }
+    
+    try {
+      // Verify notification belongs to user and mark as read
+      const result = await execute(`
+        UPDATE notifications
+        SET read_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ? AND read_at IS NULL
+      `, [notificationId, userId])
+      
+      if (result.changes === 0) {
+        return res.status(404).json({
+          success: false,
+          error: 'Notification not found or already read',
+          data: null
+        })
+      }
+      
+      res.json({
+        success: true,
+        message: 'Notification marked as read',
+        data: null
+      })
+    } catch (err) {
+      console.error('❌ Failed to mark notification as read:', err)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to mark notification as read',
+        data: null
+      })
+    }
   })
 )
 

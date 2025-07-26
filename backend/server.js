@@ -13,9 +13,13 @@ import adherenceRoutes from './src/routes/adherenceRoutes.js'
 import analyticsRoutes from './src/routes/analyticsRoutes.js'
 import adminRoutes from './src/routes/adminRoutes.js'
 import aiRoutes from './src/routes/aiRoutes.js'
+import caregiverRoutes from './src/routes/caregiverRoutes.js'
 
 // Import database initialization
 import { initializeDatabase } from './src/models/database.js'
+
+// Import notification service
+import { startNotificationService } from './src/utils/notificationService.js'
 
 // Import middleware
 import { errorHandler } from './src/middleware/errorHandler.js'
@@ -129,6 +133,9 @@ app.use('/api/admin', adminRoutes)
 // AI-powered features routes
 app.use('/api/ai', aiRoutes)
 
+// Caregiver management routes
+app.use('/api/caregiver', caregiverRoutes)
+
 /**
  * Error Handling
  * Catches and processes all errors with consistent response format
@@ -158,6 +165,11 @@ async function startServer() {
     await initializeDatabase()
     console.log('✅ Database initialized successfully')
 
+    // Start notification service for medication reminders
+    console.log('🔄 Starting notification service...')
+    const stopNotificationService = startNotificationService()
+    console.log('✅ Notification service started')
+
     // Start Express server
     app.listen(PORT, () => {
       console.log(`🚀 PillPulse API server running on port ${PORT}`)
@@ -165,6 +177,9 @@ async function startServer() {
       console.log(`🌐 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`)
       console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`)
     })
+
+    // Store cleanup function for graceful shutdown
+    process.stopNotificationService = stopNotificationService
 
   } catch (error) {
     console.error('❌ Failed to start server:', error)
@@ -180,13 +195,17 @@ async function startServer() {
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
   console.log('🔄 SIGTERM received, shutting down gracefully...')
-  // Close database connections here if needed
+  if (process.stopNotificationService) {
+    process.stopNotificationService()
+  }
   process.exit(0)
 })
 
 process.on('SIGINT', () => {
   console.log('🔄 SIGINT received, shutting down gracefully...')
-  // Close database connections here if needed
+  if (process.stopNotificationService) {
+    process.stopNotificationService()
+  }
   process.exit(0)
 })
 

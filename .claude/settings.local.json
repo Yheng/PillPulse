@@ -13,7 +13,12 @@
       "Bash(rm:*)",
       "Bash(npm install:*)",
       "Bash(npm start)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(npm run build:*)",
+      "Bash(cmd //c:*)",
+      "Bash(python:*)",
+      "Bash(git reset:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

@@ -188,9 +188,9 @@ export const ScheduleProvider = ({ children }) => {
       setError(null)
       
       const response = await axios.post('/api/adherence', {
-        schedule_id: scheduleId,
+        schedule_id: parseInt(scheduleId),
         date,
-        taken
+        taken: Boolean(taken)
       })
       
       const adherenceRecord = response.data.data

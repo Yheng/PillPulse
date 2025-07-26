@@ -2,6 +2,34 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { aiService } from '../services/api'
 
+const convertTo12HourFormat = (time24) => {
+  const [hours, minutes] = time24.split(':')
+  const hour = parseInt(hours)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const hour12 = hour % 12 || 12
+  return `${hour12}:${minutes} ${ampm}`
+}
+
+const getTimeUntil = (targetTime) => {
+  const now = new Date()
+  const [hours, minutes] = targetTime.split(':')
+  const target = new Date()
+  target.setHours(parseInt(hours), parseInt(minutes), 0, 0)
+  
+  if (target < now) {
+    target.setDate(target.getDate() + 1)
+  }
+  
+  const diff = target - now
+  const hoursUntil = Math.floor(diff / (1000 * 60 * 60))
+  const minutesUntil = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+  
+  if (hoursUntil > 0) {
+    return `${hoursUntil}h ${minutesUntil}m`
+  }
+  return `${minutesUntil}m`
+}
+
 /**
  * AI Status Indicator Component
  * Shows whether user has AI features enabled
@@ -320,8 +348,9 @@ export const DailyAICoach = ({ className = "" }) => {
           <h4 className="text-sm font-medium mb-2">⏰ Coming Up Today:</h4>
           <div className="space-y-1">
             {upcoming_medications.slice(0, 2).map((med, index) => (
-              <div key={index} className="text-xs bg-white/10 p-2 rounded">
-                {med.medication} ({med.dosage}) at {med.time}
+              <div key={index} className="text-xs bg-white/10 p-2 rounded flex items-center justify-between">
+                <span>{med.medication} ({med.dosage}) at {convertTo12HourFormat(med.time)}</span>
+                <span className="text-xs opacity-80">in {getTimeUntil(med.time)}</span>
               </div>
             ))}
           </div>

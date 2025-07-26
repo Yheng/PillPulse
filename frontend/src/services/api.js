@@ -83,6 +83,23 @@ export const userService = {
     const response = await api.put('/users/notification-settings', settingsData)
     return response.data
   },
+
+  // Get user notifications
+  async getNotifications(options = {}) {
+    const params = new URLSearchParams()
+    if (options.limit) params.append('limit', options.limit)
+    if (options.offset) params.append('offset', options.offset)
+    if (options.unread_only) params.append('unread_only', 'true')
+    
+    const response = await api.get(`/users/notifications?${params.toString()}`)
+    return response.data
+  },
+
+  // Mark notification as read
+  async markNotificationAsRead(notificationId) {
+    const response = await api.put(`/users/notifications/${notificationId}/read`)
+    return response.data
+  },
 }
 
 // Admin Services
@@ -160,6 +177,141 @@ export const aiService = {
       delay_minutes: options.delayMinutes || 0,
       user_status: options.userStatus || 'normal'
     })
+    return response.data
+  }
+}
+
+// Schedule Services
+export const scheduleService = {
+  // Get all schedules
+  async getSchedules() {
+    const response = await api.get('/schedules')
+    return response.data
+  },
+
+  // Get today's schedules
+  async getTodaysSchedules() {
+    const response = await api.get('/schedules/today')
+    return response.data
+  },
+
+  // Get today's adherence for a specific schedule
+  async getTodayAdherence(scheduleId) {
+    const today = new Date().toISOString().split('T')[0]
+    const response = await api.get(`/adherence?schedule_id=${scheduleId}&start_date=${today}&end_date=${today}&limit=1`)
+    
+    // Return the first (and only) adherence record for today
+    const records = response.data?.data || []
+    return {
+      success: true,
+      data: records.length > 0 ? records[0] : null
+    }
+  },
+
+  // Create a new schedule
+  async createSchedule(scheduleData) {
+    const response = await api.post('/schedules', scheduleData)
+    return response.data
+  },
+
+  // Update a schedule
+  async updateSchedule(scheduleId, scheduleData) {
+    const response = await api.put(`/schedules/${scheduleId}`, scheduleData)
+    return response.data
+  },
+
+  // Delete a schedule
+  async deleteSchedule(scheduleId) {
+    const response = await api.delete(`/schedules/${scheduleId}`)
+    return response.data
+  }
+}
+
+// Adherence Services
+export const adherenceService = {
+  // Log adherence
+  async logAdherence(adherenceData) {
+    const response = await api.post('/adherence', adherenceData)
+    return response.data
+  },
+
+  // Get adherence records
+  async getAdherence(params = {}) {
+    const response = await api.get('/adherence', { params })
+    return response.data
+  }
+}
+
+// Caregiver Services
+export const caregiverService = {
+  // Get user's caregiver relationships
+  async getRelationships() {
+    const response = await api.get('/caregiver/relationships')
+    return response.data
+  },
+
+  // Invite a caregiver
+  async inviteCaregiver(caregiverEmail, accessLevel, notes = null) {
+    const response = await api.post('/caregiver/invite', {
+      caregiver_email: caregiverEmail,
+      access_level: accessLevel,
+      notes
+    })
+    return response.data
+  },
+
+  // Accept caregiver invitation
+  async acceptInvitation(invitationToken) {
+    const response = await api.post('/caregiver/accept-invitation', {
+      invitation_token: invitationToken
+    })
+    return response.data
+  },
+
+  // Decline caregiver invitation
+  async declineInvitation(invitationToken) {
+    const response = await api.post('/caregiver/decline-invitation', {
+      invitation_token: invitationToken
+    })
+    return response.data
+  },
+
+  // Remove caregiver relationship
+  async removeRelationship(relationshipId) {
+    const response = await api.delete(`/caregiver/relationships/${relationshipId}`)
+    return response.data
+  },
+
+  // Get patient schedules (caregiver access)
+  async getPatientSchedules(patientId) {
+    const response = await api.get(`/caregiver/patients/${patientId}/schedules`)
+    return response.data
+  },
+
+  // Get patient adherence data (caregiver access)
+  async getPatientAdherence(patientId, params = {}) {
+    const response = await api.get(`/caregiver/patients/${patientId}/adherence`, { params })
+    return response.data
+  },
+
+  // Emergency contacts
+  async getEmergencyContacts() {
+    const response = await api.get('/caregiver/emergency-contacts')
+    return response.data
+  },
+
+  async addEmergencyContact(contactData) {
+    const response = await api.post('/caregiver/emergency-contacts', contactData)
+    return response.data
+  },
+
+  async updateEmergencyContact(contactId, contactData) {
+    const response = await api.put(`/caregiver/emergency-contacts/${contactId}`, contactData)
+    return response.data
+  },
+
+  async deleteEmergencyContact(contactId) {
+    const response = await api.delete(`/caregiver/emergency-contacts/${contactId}`)
     return response.data
   }
 }

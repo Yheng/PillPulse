@@ -3,7 +3,7 @@ import { body } from 'express-validator'
 import { authenticateToken } from '../middleware/auth.js'
 import { asyncHandler, createValidationError } from '../middleware/errorHandler.js'
 import { validationResult } from 'express-validator'
-import { queryOne, query as queryAll } from '../models/database.js'
+import { queryOne, query as queryAll, execute } from '../models/database.js'
 import { 
   generatePersonalizedReminder, 
   generateAIInsights, 
@@ -11,6 +11,7 @@ import {
   generateMedicationEducation,
   hasOpenAIKey 
 } from '../utils/openaiService.js'
+import { processAllReminders } from '../utils/notificationService.js'
 
 /**
  * AI Routes for PillPulse
@@ -218,7 +219,7 @@ router.get('/daily-summary',
     
     // Get today's schedules and adherence
     const todaySchedules = await queryAll(`
-      SELECT s.*, ar.taken, ar.actual_time, ar.notes
+      SELECT s.*, ar.taken, ar.notes, ar.created_at
       FROM schedules s
       LEFT JOIN adherence_records ar ON s.id = ar.schedule_id AND ar.date = ?
       WHERE s.user_id = ?
@@ -349,6 +350,152 @@ router.post('/smart-reminder',
         ai_generated: await hasOpenAIKey(userId)
       }
     })
+  })
+)
+
+/**
+ * GET /api/ai/debug-schedules
+ * Debug endpoint to view current schedules and timezone information
+ * Useful for debugging timing issues
+ */
+router.get('/debug-schedules',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    try {
+      // Get all schedules with user timezone info
+      const schedules = await queryAll(`
+        SELECT 
+          s.id,
+          s.user_id,
+          s.medication_name,
+          s.dosage,
+          s.time,
+          s.frequency,
+          u.timezone,
+          u.email
+        FROM schedules s
+        JOIN users u ON s.user_id = u.id
+        ORDER BY s.user_id, s.time
+      `)
+
+      // Get current time for each user's timezone
+      const enrichedSchedules = schedules.map(schedule => {
+        const userTimezone = schedule.timezone || 'America/New_York'
+        const currentTime = new Date().toLocaleTimeString('en-GB', {
+          timeZone: userTimezone,
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        })
+        const today = new Date().toLocaleDateString('en-CA', {
+          timeZone: userTimezone
+        })
+
+        return {
+          ...schedule,
+          user_timezone: userTimezone,
+          current_time: currentTime,
+          current_date: today,
+          time_passed: currentTime >= schedule.time
+        }
+      })
+
+      res.json({
+        success: true,
+        message: 'Schedule debug information retrieved',
+        data: {
+          total_schedules: schedules.length,
+          schedules: enrichedSchedules
+        }
+      })
+    } catch (error) {
+      console.error('❌ Debug schedules failed:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to retrieve debug information',
+        details: error.message
+      })
+    }
+  })
+)
+
+/**
+ * POST /api/ai/test-notification-popup
+ * Test endpoint to create a test notification that will show up as a popup
+ * Useful for testing the frontend notification system
+ */
+router.post('/test-notification-popup',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    const userId = req.user.id
+    
+    try {
+      // Create a test notification that will be picked up by the polling service
+      const testTitle = '🧪 Test Medication Reminder'
+      const testMessage = 'This is a test notification to verify that the popup system is working correctly. Take your test medication now!'
+      
+      const result = await execute(`
+        INSERT INTO notifications (user_id, schedule_id, type, title, message, ai_generated)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [userId, null, 'test', testTitle, testMessage, 0])
+      
+      console.log(`🧪 Test notification created for user ${userId}`)
+      
+      res.json({
+        success: true,
+        message: 'Test notification created successfully',
+        data: {
+          notification_id: result.lastID,
+          title: testTitle,
+          message: testMessage,
+          user_id: userId,
+          note: 'This notification should appear as a popup within 30 seconds when the polling service checks for new notifications.'
+        }
+      })
+    } catch (error) {
+      console.error('❌ Failed to create test notification:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create test notification',
+        details: error.message
+      })
+    }
+  })
+)
+
+/**
+ * POST /api/ai/test-notifications
+ * Test endpoint to manually trigger notification processing
+ * Useful for debugging notification timing issues
+ */
+router.post('/test-notifications',
+  authenticateToken,
+  asyncHandler(async (req, res) => {
+    console.log('🧪 Manual notification test triggered by user:', req.user.id)
+    
+    try {
+      const results = await processAllReminders()
+      
+      res.json({
+        success: true,
+        message: 'Notification processing test completed',
+        data: {
+          regular_reminders: results.regular_reminders.length,
+          missed_reminders: results.missed_reminders.length,
+          coaching_messages: results.coaching_messages.length,
+          total_processed: results.total_processed,
+          errors: results.errors.length,
+          details: results
+        }
+      })
+    } catch (error) {
+      console.error('❌ Test notification processing failed:', error)
+      res.status(500).json({
+        success: false,
+        error: 'Failed to process test notifications',
+        details: error.message
+      })
+    }
   })
 )
 

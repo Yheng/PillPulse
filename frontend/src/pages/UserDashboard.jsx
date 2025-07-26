@@ -7,6 +7,8 @@ import { LoadingStates, ButtonLoader } from '../components/LoadingSpinner'
 import { AIStatusIndicator, SmartReminderButton, AIInsightsPanel, DailyAICoach, MedicationEducationTooltip } from '../components/AIFeatures'
 import PushNotificationManager, { NotificationPermissionBadge } from '../components/PushNotificationManager'
 import pushNotificationService from '../services/notificationService'
+import ContextualHelp, { HelpBadge } from '../components/ContextualHelp'
+import { useOnboarding } from '../context/OnboardingContext'
 
 /**
  * User Dashboard Component
@@ -16,6 +18,7 @@ import pushNotificationService from '../services/notificationService'
  */
 const UserDashboard = () => {
   const { user, isAuthenticated } = useAuth()
+  const { needsHelpWith } = useOnboarding()
   const {
     schedules,
     loading,
@@ -24,7 +27,8 @@ const UserDashboard = () => {
     logAdherence,
     getTodaysSchedules,
     getAdherenceStatus,
-    setError
+    setError,
+    adherenceRecords
   } = useSchedule()
 
   // Component state for form handling and UI interactions
@@ -37,10 +41,53 @@ const UserDashboard = () => {
   })
   const [submitting, setSubmitting] = useState(false)
   const [formErrors, setFormErrors] = useState({})
+  const [streakDays, setStreakDays] = useState(0)
 
   // Get today's date in YYYY-MM-DD format for adherence tracking
   const today = new Date().toISOString().split('T')[0]
   const todaysSchedules = getTodaysSchedules() || []
+
+  /**
+   * Calculate current streak based on adherence records
+   * Counts consecutive days where all medications were taken
+   */
+  useEffect(() => {
+    if (!adherenceRecords || adherenceRecords.length === 0 || schedules.length === 0) {
+      setStreakDays(0)
+      return
+    }
+
+    // Group adherence records by date
+    const adherenceByDate = {}
+    adherenceRecords.forEach(record => {
+      if (!adherenceByDate[record.date]) {
+        adherenceByDate[record.date] = { taken: 0, total: 0 }
+      }
+      adherenceByDate[record.date].total++
+      if (record.taken) {
+        adherenceByDate[record.date].taken++
+      }
+    })
+
+    // Calculate streak starting from today going backwards
+    let streak = 0
+    const currentDate = new Date()
+    
+    while (true) {
+      const dateStr = currentDate.toISOString().split('T')[0]
+      const dayData = adherenceByDate[dateStr]
+      
+      // If no data for this day or not all medications were taken, break streak
+      if (!dayData || dayData.taken < dayData.total) {
+        break
+      }
+      
+      streak++
+      currentDate.setDate(currentDate.getDate() - 1)
+    }
+    
+    setStreakDays(streak)
+  }, [adherenceRecords, schedules])
 
   /**
    * Handle input changes in the add medication form
@@ -283,13 +330,21 @@ const UserDashboard = () => {
           </motion.div>
 
           {/* All Schedules Section */}
-          <motion.div
-            className="bg-white rounded-lg shadow-md p-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+          <ContextualHelp 
+            feature="medication-card" 
+            trigger="hover" 
+            position="top"
           >
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">All Medications</h2>
+            <motion.div
+              className="bg-white rounded-lg shadow-md p-6 relative"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              {needsHelpWith('medication-card') && schedules.length > 0 && (
+                <HelpBadge feature="medication-card" className="absolute -top-2 -right-2" />
+              )}
+              <h2 className="text-2xl font-semibold text-gray-800 mb-4">All Medications</h2>
             
             {!Array.isArray(schedules) || schedules.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
@@ -332,78 +387,100 @@ const UserDashboard = () => {
               </div>
             )}
           </motion.div>
+          </ContextualHelp>
+
+          {/* Quick Actions and Streak Counter Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Quick Actions */}
+            <motion.div
+              className="bg-white rounded-lg shadow-md p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
+              <div className="space-y-3">
+                <ContextualHelp 
+                  feature="add-medication" 
+                  trigger="hover" 
+                  position="top"
+                >
+                  <motion.button
+                    onClick={() => setShowAddForm(true)}
+                    className="add-medication-btn w-full bg-pillpulse-blue hover:bg-pillpulse-teal text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200 relative"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    Add Schedule
+                    {needsHelpWith('add-medication') && (
+                      <HelpBadge feature="add-medication" className="absolute -top-2 -right-2" />
+                    )}
+                  </motion.button>
+                </ContextualHelp>
+                <motion.button
+                  onClick={() => window.location.href = '/analytics'}
+                  className="w-full bg-pillpulse-green hover:bg-green-600 text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  View Analytics
+                </motion.button>
+                <motion.button
+                  className="w-full bg-pillpulse-teal hover:bg-teal-600 text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  Caregiver Sync
+                </motion.button>
+              </div>
+            </motion.div>
+
+            {/* Streak Counter */}
+            <ContextualHelp 
+              feature="streak-counter" 
+              trigger="hover" 
+              position="left"
+            >
+              <motion.div
+                className="streak-counter bg-white rounded-lg shadow-md p-6 relative"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+              >
+                {needsHelpWith('streak-counter') && (
+                  <HelpBadge feature="streak-counter" className="absolute -top-2 -right-2" />
+                )}
+                <div className="text-center">
+                  <motion.div
+                    className="w-20 h-20 bg-pillpulse-green rounded-full flex items-center justify-center mx-auto mb-4"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.6 }}
+                  >
+                    <span className="text-white font-bold text-2xl">🔥</span>
+                  </motion.div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Streak Counter</h3>
+                  <p className="text-3xl font-bold text-pillpulse-green mb-2">{streakDays} {streakDays === 1 ? 'Day' : 'Days'}</p>
+                  <p className="text-sm text-gray-600">
+                    {streakDays === 0 ? 'Start your streak today!' : 
+                     streakDays < 3 ? 'Keep going!' : 
+                     streakDays < 7 ? 'Great job!' : 
+                     streakDays < 30 ? 'Amazing consistency!' : 
+                     'Incredible dedication!'}
+                  </p>
+                </div>
+              </motion.div>
+            </ContextualHelp>
+          </div>
         </div>
 
         {/* Right Column - Analytics (40% on desktop) */}
         <div className="lg:col-span-1 space-y-6">
-          {/* AI Status Indicator */}
-          <div className="flex items-center justify-between bg-white rounded-lg shadow-md p-4">
-            <span className="text-sm font-medium text-gray-700">AI Features</span>
-            <AIStatusIndicator />
-          </div>
-
           {/* Daily AI Coach */}
           <DailyAICoach />
 
           {/* AI Insights Panel */}
           <AIInsightsPanel />
-
-          {/* Streak Counter */}
-          <motion.div
-            className="bg-white rounded-lg shadow-md p-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          >
-            <div className="text-center">
-              <motion.div
-                className="w-20 h-20 bg-pillpulse-green rounded-full flex items-center justify-center mx-auto mb-4"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.5 }}
-              >
-                <span className="text-white font-bold text-2xl">🔥</span>
-              </motion.div>
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">Streak Counter</h3>
-              <p className="text-3xl font-bold text-pillpulse-green mb-2">5 Days</p>
-              <p className="text-sm text-gray-600">Keep it up!</p>
-            </div>
-          </motion.div>
-
-          {/* Quick Actions */}
-          <motion.div
-            className="bg-white rounded-lg shadow-md p-6"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
-            <div className="space-y-3">
-              <motion.button
-                onClick={() => setShowAddForm(true)}
-                className="w-full bg-pillpulse-blue hover:bg-pillpulse-teal text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Add Schedule
-              </motion.button>
-              <motion.button
-                onClick={() => window.location.href = '/analytics'}
-                className="w-full bg-pillpulse-green hover:bg-green-600 text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                View Analytics
-              </motion.button>
-              <motion.button
-                className="w-full bg-pillpulse-teal hover:bg-teal-600 text-white py-3 px-4 rounded-md text-sm font-medium transition-colors duration-200"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                Caregiver Sync
-              </motion.button>
-            </div>
-          </motion.div>
         </div>
       </div>
 

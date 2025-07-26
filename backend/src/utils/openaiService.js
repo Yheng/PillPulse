@@ -166,10 +166,10 @@ export async function generateAIInsights(userId) {
         s.frequency,
         ar.date,
         ar.taken,
-        ar.actual_time,
         ar.notes,
+        ar.created_at,
         strftime('%w', ar.date) as day_of_week,
-        strftime('%H', ar.actual_time) as hour_taken
+        strftime('%H', ar.created_at) as hour_taken
       FROM adherence_records ar
       JOIN schedules s ON ar.schedule_id = s.id
       WHERE s.user_id = ? AND ar.date >= date('now', '-30 days')
@@ -195,7 +195,7 @@ Medications:
 ${context.schedules.map(s => `- ${s.medication_name} (${s.dosage}) at ${s.time}, ${s.frequency}`).join('\n')}
 
 Recent Adherence Patterns:
-${adherenceData.slice(0, 10).map(a => `- ${a.medication_name}: ${a.taken ? 'TAKEN' : 'MISSED'} on ${a.date}${a.actual_time ? ` at ${a.actual_time}` : ''}${a.notes ? ` (${a.notes})` : ''}`).join('\n')}
+${adherenceData.slice(0, 10).map(a => `- ${a.medication_name}: ${a.taken ? 'TAKEN' : 'MISSED'} on ${a.date}${a.created_at ? ` (recorded at ${a.created_at})` : ''}${a.notes ? ` (${a.notes})` : ''}`).join('\n')}
 
 Analyze this data and provide:
 1. Performance insights (2-3 key observations about their adherence)

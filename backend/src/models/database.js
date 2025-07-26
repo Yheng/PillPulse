@@ -87,6 +87,7 @@ const SCHEMA_STATEMENTS = [
     email_notifications BOOLEAN DEFAULT 1,
     sms_notifications BOOLEAN DEFAULT 0,
     reminder_frequency INTEGER DEFAULT 30,
+    timezone TEXT DEFAULT 'America/New_York',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -128,6 +129,68 @@ const SCHEMA_STATEMENTS = [
     FOREIGN KEY (admin_id) REFERENCES users (id) ON DELETE CASCADE
   )`,
 
+  // Notifications table - stores sent notifications for tracking and display
+  `CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    schedule_id INTEGER NULL,
+    type TEXT NOT NULL CHECK (type IN ('reminder', 'missed_dose', 'coaching', 'test')),
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    read_at DATETIME NULL,
+    ai_generated BOOLEAN DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (schedule_id) REFERENCES schedules (id) ON DELETE CASCADE
+  )`,
+
+  // Caregiver relationships table - manages patient-caregiver connections
+  `CREATE TABLE IF NOT EXISTS caregiver_relationships (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL,
+    caregiver_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined', 'revoked')),
+    access_level TEXT NOT NULL DEFAULT 'view' CHECK (access_level IN ('view', 'edit', 'full')),
+    invited_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    accepted_at DATETIME NULL,
+    created_by INTEGER NOT NULL,
+    notes TEXT NULL,
+    FOREIGN KEY (patient_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (caregiver_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE CASCADE,
+    UNIQUE(patient_id, caregiver_id)
+  )`,
+
+  // Emergency contacts table - stores emergency contact information
+  `CREATE TABLE IF NOT EXISTS emergency_contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    relationship TEXT NOT NULL,
+    phone TEXT NULL,
+    email TEXT NULL,
+    priority INTEGER DEFAULT 1,
+    notify_missed_doses BOOLEAN DEFAULT 1,
+    notify_emergencies BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+  )`,
+
+  // Caregiver invitations table - temporary storage for invitation tokens
+  `CREATE TABLE IF NOT EXISTS caregiver_invitations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    patient_id INTEGER NOT NULL,
+    caregiver_email TEXT NOT NULL,
+    invitation_token TEXT UNIQUE NOT NULL,
+    access_level TEXT NOT NULL DEFAULT 'view' CHECK (access_level IN ('view', 'edit', 'full')),
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    notes TEXT NULL,
+    FOREIGN KEY (patient_id) REFERENCES users (id) ON DELETE CASCADE
+  )`,
+
   // Create indexes for better query performance
   'CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)',
   'CREATE INDEX IF NOT EXISTS idx_schedules_user_id ON schedules (user_id)',
@@ -135,7 +198,18 @@ const SCHEMA_STATEMENTS = [
   'CREATE INDEX IF NOT EXISTS idx_adherence_schedule_id ON adherence_records (schedule_id)',
   'CREATE INDEX IF NOT EXISTS idx_adherence_date ON adherence_records (date)',
   'CREATE INDEX IF NOT EXISTS idx_adherence_schedule_date ON adherence_records (schedule_id, date)',
-  'CREATE INDEX IF NOT EXISTS idx_settings_admin_id ON settings (admin_id)'
+  'CREATE INDEX IF NOT EXISTS idx_settings_admin_id ON settings (admin_id)',
+  'CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications (user_id)',
+  'CREATE INDEX IF NOT EXISTS idx_notifications_sent_at ON notifications (sent_at)',
+  'CREATE INDEX IF NOT EXISTS idx_notifications_user_sent ON notifications (user_id, sent_at)',
+  'CREATE INDEX IF NOT EXISTS idx_caregiver_relationships_patient ON caregiver_relationships (patient_id)',
+  'CREATE INDEX IF NOT EXISTS idx_caregiver_relationships_caregiver ON caregiver_relationships (caregiver_id)',
+  'CREATE INDEX IF NOT EXISTS idx_caregiver_relationships_status ON caregiver_relationships (status)',
+  'CREATE INDEX IF NOT EXISTS idx_emergency_contacts_user ON emergency_contacts (user_id)',
+  'CREATE INDEX IF NOT EXISTS idx_emergency_contacts_priority ON emergency_contacts (user_id, priority)',
+  'CREATE INDEX IF NOT EXISTS idx_caregiver_invitations_patient ON caregiver_invitations (patient_id)',
+  'CREATE INDEX IF NOT EXISTS idx_caregiver_invitations_token ON caregiver_invitations (invitation_token)',
+  'CREATE INDEX IF NOT EXISTS idx_caregiver_invitations_email ON caregiver_invitations (caregiver_email)'
 ]
 
 /**
@@ -148,6 +222,8 @@ const MIGRATION_STATEMENTS = [
   `ALTER TABLE users ADD COLUMN email_notifications BOOLEAN DEFAULT 1`,
   `ALTER TABLE users ADD COLUMN sms_notifications BOOLEAN DEFAULT 0`,
   `ALTER TABLE users ADD COLUMN reminder_frequency INTEGER DEFAULT 30`,
+  // Add timezone column to users table if it doesn't exist
+  `ALTER TABLE users ADD COLUMN timezone TEXT DEFAULT 'America/New_York'`,
   // Add notes column to schedules table if it doesn't exist
   `ALTER TABLE schedules ADD COLUMN notes TEXT NULL`
 ]

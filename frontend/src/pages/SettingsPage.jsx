@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
 import { apiKeyService, userService, adminService } from '../services/api'
 import { NotificationPermissionBadge } from '../components/PushNotificationManager'
+import { testNotification, notificationSound } from '../utils/notificationSound'
+import { TIMEZONE_OPTIONS, getUserTimezone, formatTimezoneDisplay } from '../utils/timezone'
 
 /**
  * Settings Page Component
@@ -25,7 +27,8 @@ const SettingsPage = () => {
     pushNotifications: true,
     emailNotifications: true,
     smsNotifications: false,
-    reminderFrequency: 30
+    reminderFrequency: 30,
+    timezone: getUserTimezone()
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -33,6 +36,7 @@ const SettingsPage = () => {
   const [showApiKey, setShowApiKey] = useState(false)
   const [hasApiKey, setHasApiKey] = useState(false)
   const [maskedApiKey, setMaskedApiKey] = useState('')
+  const [testingNotification, setTestingNotification] = useState(false)
 
   /**
    * Load user data, API key, and notification settings on component mount
@@ -57,7 +61,8 @@ const SettingsPage = () => {
             pushNotifications: settings.push_notifications,
             emailNotifications: settings.email_notifications,
             smsNotifications: settings.sms_notifications,
-            reminderFrequency: settings.reminder_frequency
+            reminderFrequency: settings.reminder_frequency,
+            timezone: settings.timezone || getUserTimezone()
           }))
         } else {
           // Set defaults if loading fails
@@ -132,7 +137,8 @@ const SettingsPage = () => {
         push_notifications: formData.pushNotifications,
         email_notifications: formData.emailNotifications,
         sms_notifications: formData.smsNotifications,
-        reminder_frequency: formData.reminderFrequency
+        reminder_frequency: formData.reminderFrequency,
+        timezone: formData.timezone
       })
       
       if (response.success) {
@@ -218,6 +224,42 @@ const SettingsPage = () => {
       setError(err.response?.data?.error || err.message || 'Failed to change password')
     } finally {
       setLoading(false)
+    }
+  }
+
+  /**
+   * Handle test notification
+   * Shows a test notification with sound to preview the user experience
+   */
+  const handleTestNotification = async () => {
+    try {
+      setTestingNotification(true)
+      setError('')
+      setSuccess('')
+
+      // Request notification permission if needed
+      if (Notification.permission === 'default') {
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') {
+          setError('Please allow notifications to test the alert')
+          return
+        }
+      }
+
+      if (Notification.permission === 'denied') {
+        setError('Notifications are blocked. Please enable them in your browser settings.')
+        return
+      }
+
+      // Show test notification
+      await testNotification()
+      setSuccess('Test notification sent! Check your notification area.')
+      
+    } catch (err) {
+      console.error('Test notification failed:', err)
+      setError('Failed to send test notification. Please check your browser settings.')
+    } finally {
+      setTestingNotification(false)
     }
   }
 
@@ -534,29 +576,65 @@ const SettingsPage = () => {
                   <input
                     type="range"
                     name="reminderFrequency"
-                    min="10"
-                    max="120"
-                    step="10"
+                    min="1"
+                    max="60"
+                    step="1"
                     value={formData.reminderFrequency}
                     onChange={handleInputChange}
                     className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                   />
                   <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>10 min</span>
+                    <span>1 min</span>
                     <span className="font-medium">{formData.reminderFrequency} min</span>
-                    <span>120 min</span>
+                    <span>60 min</span>
                   </div>
                 </div>
 
-                <motion.button
-                  type="submit"
-                  className="bg-pillpulse-green hover:bg-pillpulse-teal text-white py-3 px-6 rounded-md font-medium transition-colors duration-200"
-                  disabled={loading}
-                  whileHover={{ scale: loading ? 1 : 1.02 }}
-                  whileTap={{ scale: loading ? 1 : 0.98 }}
-                >
-                  {loading ? 'Updating...' : 'Save'}
-                </motion.button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Timezone
+                  </label>
+                  <select
+                    name="timezone"
+                    value={formData.timezone}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pillpulse-blue focus:border-transparent"
+                    disabled={loading}
+                  >
+                    {TIMEZONE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Your timezone is used for scheduling medication reminders at the correct local time
+                  </p>
+                </div>
+
+                <div className="flex space-x-4">
+                  <motion.button
+                    type="submit"
+                    className="bg-pillpulse-green hover:bg-pillpulse-teal text-white py-3 px-6 rounded-md font-medium transition-colors duration-200"
+                    disabled={loading}
+                    whileHover={{ scale: loading ? 1 : 1.02 }}
+                    whileTap={{ scale: loading ? 1 : 0.98 }}
+                  >
+                    {loading ? 'Updating...' : 'Save'}
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={handleTestNotification}
+                    className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-md font-medium transition-colors duration-200 flex items-center space-x-2"
+                    disabled={testingNotification || loading}
+                    whileHover={{ scale: (testingNotification || loading) ? 1 : 1.02 }}
+                    whileTap={{ scale: (testingNotification || loading) ? 1 : 0.98 }}
+                  >
+                    <span>{testingNotification ? '🔄' : '🔔'}</span>
+                    <span>{testingNotification ? 'Testing...' : 'Test Alert'}</span>
+                  </motion.button>
+                </div>
               </form>
             </div>
           )}

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
+import notificationPollingService from '../services/notificationPollingService'
 
 /**
  * Authentication Context for PillPulse application
@@ -80,6 +81,11 @@ export const AuthProvider = ({ children }) => {
           })
           setUser(response.data.data)
           console.log('✅ Token verified successfully, user:', response.data.data.email)
+          
+          // Initialize notification polling service for authenticated users
+          if (!notificationPollingService.getStatus().initialized) {
+            notificationPollingService.initialize(30000) // Check every 30 seconds
+          }
         } catch (error) {
           // Token is invalid, clear it
           console.error('❌ Token verification failed:', error.response?.status, error.message)
@@ -119,6 +125,11 @@ export const AuthProvider = ({ children }) => {
       
       setToken(newToken)
       setUser(userData)
+      
+      // Initialize notification polling service for authenticated users
+      if (!notificationPollingService.getStatus().initialized) {
+        notificationPollingService.initialize(30000) // Check every 30 seconds
+      }
       
       return response.data
     } catch (error) {
@@ -163,6 +174,9 @@ export const AuthProvider = ({ children }) => {
     setToken(null)
     setUser(null)
     delete axios.defaults.headers.common['Authorization']
+    
+    // Stop notification polling when user logs out
+    notificationPollingService.stopPolling()
   }
 
   /**

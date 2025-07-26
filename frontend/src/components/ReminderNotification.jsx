@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useSchedule } from '../context/ScheduleContext'
 
 /**
  * Reminder Notification Component
@@ -169,6 +170,7 @@ const ReminderNotification = ({
  */
 export const ReminderNotificationManager = () => {
   const [notifications, setNotifications] = useState([])
+  const { logAdherence } = useSchedule()
 
   /**
    * Add a new notification
@@ -191,26 +193,36 @@ export const ReminderNotificationManager = () => {
    * Mark medication as taken
    * @param {number} notificationId - Notification ID
    */
-  const handleTaken = (notificationId) => {
+  const handleTaken = async (notificationId) => {
     const notification = notifications.find(n => n.id === notificationId)
-    if (notification) {
-      // Here you would typically call an API to log adherence
-      console.log('Medication taken:', notification)
-      dismissNotification(notificationId)
+    if (notification && notification.schedule_id) {
+      try {
+        const today = new Date().toISOString().split('T')[0]
+        await logAdherence(notification.schedule_id, today, true)
+        console.log('Medication marked as taken:', notification)
+      } catch (error) {
+        console.error('Failed to log medication taken:', error)
+      }
     }
+    dismissNotification(notificationId)
   }
 
   /**
    * Mark medication as missed
    * @param {number} notificationId - Notification ID
    */
-  const handleMissed = (notificationId) => {
+  const handleMissed = async (notificationId) => {
     const notification = notifications.find(n => n.id === notificationId)
-    if (notification) {
-      // Here you would typically call an API to log adherence
-      console.log('Medication missed:', notification)
-      dismissNotification(notificationId)
+    if (notification && notification.schedule_id) {
+      try {
+        const today = new Date().toISOString().split('T')[0]
+        await logAdherence(notification.schedule_id, today, false)
+        console.log('Medication marked as missed:', notification)
+      } catch (error) {
+        console.error('Failed to log medication missed:', error)
+      }
     }
+    dismissNotification(notificationId)
   }
 
   /**
